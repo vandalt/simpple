@@ -24,6 +24,11 @@ dependencies = [
   "scipy",
 ]
 
+[project.optional-dependencies]
+docs = [
+  "sphinx",
+]
+
 [project.urls]
 # TODO: Publish this on rtd
 "Homepage" = "https://simpple.readthedocs.io"
