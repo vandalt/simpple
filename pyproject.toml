@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "simpple"
 # TODO: Version with git?
-version = 0.0.1
+version = "0.0.1"
 authors = [
   { name="Thomas Vandal", email="thomas.vandal@umontreal.ca" },
 ]
