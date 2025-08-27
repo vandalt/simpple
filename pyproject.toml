@@ -27,6 +27,8 @@ dependencies = [
 [project.optional-dependencies]
 docs = [
   "sphinx",
+  "myst-parser",
+  "sphinx-book-theme",
 ]
 
 [project.urls]

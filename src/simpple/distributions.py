@@ -1,3 +1,6 @@
+# Required so ArrayLike does not look terrible
+from __future__ import annotations
+
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -22,10 +25,20 @@ class Distribution(ABC):
 
     @abstractmethod
     def log_prob(self, x: float | ArrayLike) -> float | np.ndarray:
+        """Log probability density of the distribution
+
+        This should be implemented by subclasses.
+        """
         pass
 
     @abstractmethod
     def prior_transform(self, u: float | ArrayLike) -> float | np.ndarray:
+        """Prior transform of the distribution
+
+        This should be implemented by subclasses.
+        The prior transform should take values from the uniform unit interval and project them to the prior space.
+        This is usually the inverse CDF, or percent-point function, of the distribution.
+        """
         pass
 
     @abstractmethod
@@ -34,17 +47,25 @@ class Distribution(ABC):
         size: int | None = None,
         seed: int | np.ndarray[int] | None = None,
     ) -> np.ndarray:
+        """Draw samples from the distribution
+
+        This should be implemented by subclasses.
+        The method should return the desired number of samples from the distributions.
+        For most distributions, this will be an alias to scipy's `rvs()` method or numpy's random API.
+        This method will be used when generating prior samples for the model.
+        """
         pass
 
 
 class ScipyDistribution(Distribution):
-    def __init__(self, dist: rv_continuous | Callable, *args, **kwargs):
-        """Distribution based on a scipy random variable.
+    """Distribution based on a scipy random variable.
 
-        :param dist: Scipy random variable (RV), either already instantiated or not.
-                     If the RV is not instantiated, it will be during init and all args
-                     and kwargs are passed to it.
-        """
+    :param dist: Scipy random variable (RV), either already instantiated or not.
+                 If the RV is not instantiated, it will be during init and all args
+                 and kwargs are passed to it.
+    """
+
+    def __init__(self, dist: rv_continuous | Callable, *args, **kwargs):
         if hasattr(dist, "dist") and hasattr(dist, "args"):
             if len(kwargs) > 0 or len(args) > 0:
                 warnings.warn(
