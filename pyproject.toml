@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "simpple"
+# TODO: Version with git?
+version = 0.0.1
+authors = [
+  { name="Thomas Vandal", email="thomas.vandal@umontreal.ca" },
+]
+description = "Simple probabilistic programming language"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+]
+license = "MIT"
+license-files = ["LICENSE"]
+
+[project.urls]
+# TODO: Publish this on rtd
+"Homepage" = "https://simpple.readthedocs.io"
+# TODO: Push to github
+"Repository" = "https://github.com/vandalt/simpple"
+"Bug Tracker" = "https://github.com/vandalt/simpple/issues"
