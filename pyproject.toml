@@ -21,6 +21,7 @@ dynamic = ["version"]
 dependencies = [
   "numpy",
   "scipy",
+  "matplotlib",
   "nautilus-sampler",
 ]
 
@@ -33,7 +34,6 @@ docs = [
   "myst-parser",
   "myst-nb",
   "sphinx-book-theme",
-  "matplotlib",
   "corner",
   "emcee",
   "tqdm",
