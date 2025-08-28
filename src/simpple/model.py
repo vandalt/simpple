@@ -11,6 +11,13 @@ if TYPE_CHECKING:
 
 
 class Model:
+    """Simpple model
+
+    :param parameters: dictionary of parameters mapping parameter names to a
+                      prior (`simpple.Distribution` object).
+    :param log_likelihood: log-likelihood function that accepts a dictionary of parameters.
+    """
+
     def __init__(self, parameters: dict, log_likelihood: Callable):
         self.parameters = parameters
         self._log_likelihood = log_likelihood

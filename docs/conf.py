@@ -8,9 +8,9 @@ import simpple
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'simpple'
-copyright = '2025, Thomas Vandal'
-author = 'Thomas Vandal'
+project = "simpple"
+copyright = "2025, Thomas Vandal"
+author = "Thomas Vandal"
 release = simpple.__version__
 
 # -- General configuration ---------------------------------------------------
@@ -21,20 +21,24 @@ extensions = [
     "myst_nb",
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# -- Options for myst-nb -----------------------------------------------------
+# Execute manually to render \r properly
+nb_execution_mode = "off"
+nb_execution_timeout = -1
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_book_theme'
+html_theme = "sphinx_book_theme"
 html_theme_options = {
     "repository_url": "https://github.com/vandalt/simpple",
     "use_repository_button": True,
 }
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 # -- Options for autodoc -----------------------------------------------------
 autodoc_typehints = "description"
