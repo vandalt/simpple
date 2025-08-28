@@ -32,8 +32,6 @@ docs = [
 ]
 
 [project.urls]
-# TODO: Publish this on rtd
 "Homepage" = "https://simpple.readthedocs.io"
-# TODO: Push to github
 "Repository" = "https://github.com/vandalt/simpple"
 "Bug Tracker" = "https://github.com/vandalt/simpple/issues"
