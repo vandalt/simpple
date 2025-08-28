@@ -42,7 +42,6 @@ class Distribution(ABC):
         """
         pass
 
-    @abstractmethod
     def sample(
         self,
         size: int | None = None,
@@ -50,12 +49,16 @@ class Distribution(ABC):
     ) -> np.ndarray:
         """Draw samples from the distribution
 
-        This should be implemented by subclasses.
-        The method should return the desired number of samples from the distributions.
-        For most distributions, this will be an alias to scipy's `rvs()` method or numpy's random API.
-        This method will be used when generating prior samples for the model.
+        Generates random uniform samples and calls the prior transform.
+
+        :param size: Shape of the samples
+        :param seed: Random seed to use
+        :return: Random samples with shape `size`
         """
-        pass
+        rng = np.random.default_rng(seed=seed)
+        u = rng.uniform(low=0.0, high=1.0, size=size)
+        p = self.prior_transform(u)
+        return p
 
 
 class ScipyDistribution(Distribution):
@@ -129,3 +132,41 @@ class ScipyDistribution(Distribution):
         if not isinstance(seed, Generator):
             seed = np.random.default_rng(seed=seed)
         return self.dist.rvs(size=size, random_state=seed, **kwargs)
+
+
+class Uniform(Distribution):
+    def __init__(self, low: float, high: float):
+        self.low = low
+        self.high = high
+        if self.low > self.high:
+            raise ValueError(
+                "lower bound should be lower than upper bound for uniform distribution"
+            )
+
+    def __repr__(self) -> str:
+        return f"Uniform(low={self.low}, high={self.high})"
+
+    def log_prob(self, x: float | ArrayLike) -> float | np.ndarray:
+        """Log-probability for the uniform distribution
+
+        :param x: Value(s) at which to evaluate the log probability.
+        :return: Log probability value(s)
+        """
+        lp = np.where(
+            np.logical_and(x >= self.low, x < self.high),
+            -np.log(self.high - self.low),
+            -np.inf,
+        )
+        if lp.ndim == 0:
+            return lp.item()
+        return lp
+
+    def prior_transform(self, u: float | ArrayLike) -> float | np.ndarray:
+        """Prior transform (inverse CDF) of the uniform distribution.
+
+        :param u: Uniform samples between 0 and 1
+        :return: Transformed samples between `self.low` and `self.high`
+        """
+        if np.any(np.logical_or(u < 0.0, u > 1.0)):
+            raise ValueError("Prior transform expects values between 0 and 1.")
+        return self.low + (self.high - self.low) * u

@@ -10,6 +10,7 @@ DISTRIBUTIONS = {
     sd.ScipyDistribution(uniform(-1000, 1000)): uniform(-1000, 1000),
     sd.ScipyDistribution(norm(0, 1)): norm(0, 1),
     sd.ScipyDistribution(norm(5, 0.001)): norm(5, 0.001),
+    sd.Uniform(10, 25): uniform(10.0, 15.0),
 }
 
 @pytest.mark.parametrize("dist,sp_dist", list(DISTRIBUTIONS.items()))
