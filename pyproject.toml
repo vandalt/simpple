@@ -39,6 +39,7 @@ docs = [
   "tqdm",
   "ultranest",
 ]
+test = ["pytest"]
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/simpple/_version.py"
