@@ -5,6 +5,7 @@ It provides common distributions, a Model class and utility functions to easily 
 The goal of simpple is to bring some of the features from probabilistic programming languages such as PyMC and Numpyro for models that were not implemented with a tensor library such as PyTensor or JAX.
 
 ```{toctree}
+:maxdepth: 1
 :caption: Table of contents
 
 installation
