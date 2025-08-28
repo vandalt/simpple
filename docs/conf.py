@@ -1,3 +1,5 @@
+import simpple
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -9,14 +11,14 @@
 project = 'simpple'
 copyright = '2025, Thomas Vandal'
 author = 'Thomas Vandal'
-release = '0.0.1'
+release = simpple.__version__
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
     "sphinx.ext.autodoc",
-    "myst_parser",
+    "myst_nb",
 ]
 
 templates_path = ['_templates']

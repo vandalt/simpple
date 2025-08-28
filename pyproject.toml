@@ -21,6 +21,7 @@ dynamic = ["version"]
 dependencies = [
   "numpy",
   "scipy",
+  "nautilus-sampler",
 ]
 
 [tool.hatch.version]
@@ -30,7 +31,13 @@ source = "vcs"
 docs = [
   "sphinx",
   "myst-parser",
+  "myst-nb",
   "sphinx-book-theme",
+  "matplotlib",
+  "corner",
+  "emcee",
+  "tqdm",
+  "ultranest",
 ]
 
 [tool.hatch.build.hooks.vcs]

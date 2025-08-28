@@ -9,5 +9,6 @@ The goal of simpple is to bring some of the features from probabilistic programm
 :caption: Table of contents
 
 installation
+tutorials/index
 api/index
 ```
