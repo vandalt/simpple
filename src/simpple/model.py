@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy.random import Generator
 from numpy.typing import ArrayLike
 
 if TYPE_CHECKING:
@@ -30,6 +31,11 @@ class Model:
             "log_likelihood must be passed to init or _log_likelihood must be "
             "implemented by subclasses."
         )
+
+    @property
+    def ndim(self):
+        """Number of dimensions (parameters) in the model"""
+        return len(self.keys())
 
     def keys(self) -> list[str]:
         """Get a list of parameter names"""
@@ -67,8 +73,13 @@ class Model:
         """
         is_dict = isinstance(u, dict)
         if is_dict:
-            u = np.array(list(u.values()))
+            # Using loop over keys instead of list ensures keys are correct
+            u = np.array([u[k] for k in self.keys()])
         x = np.array(u)
+        if x.shape[0] != self.ndim:
+            raise ValueError(
+                f"Expected {self.ndim} elements for the transform, got {x.shape[0]}"
+            )
         for i, pdist in enumerate(self.parameters.values()):
             x[i] = pdist.prior_transform(u[i])
         if is_dict:
@@ -84,6 +95,12 @@ class Model:
 
         prior = Prior()
         for pname, pdist in self.parameters.items():
+            if not hasattr(pdist, "dist"):
+                raise AttributeError(
+                    f"distribution {pdist} for parameter {pname} has no scipy distribution. "
+                    f"This is required to build a Nautilus prior. "
+                    "Either use the prior_transform() with nautilus or add a 'dist' attribute with the scipy distribution."
+                )
             prior.add_parameter(pname, pdist.dist)
         return prior
 
@@ -95,19 +112,25 @@ class Model:
         """
         if not isinstance(parameters, dict):
             parameters = dict(zip(self.keys(), parameters, strict=True))
+
         lp = self.log_prior(parameters)
         if np.isfinite(lp):
             return lp + self.log_likelihood(parameters, *args, **kwargs)
         return lp
 
-    def get_prior_samples(self, n_samples: int, fmt: str = "dict") -> dict:
+    def get_prior_samples(
+        self,
+        n_samples: int,
+        fmt: str = "dict",
+        seed: int | Generator | np.ndarray[int] | None = None,
+    ) -> dict:
         """Generate prior samples for all parameters
 
         :param n_samples: Number of samples
         :param fmt: Format of the samples (dict or array)
         :return: Dictionary of prior samples
         """
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(seed=seed)
         u = rng.uniform(size=(len(self.parameters), n_samples))
         if fmt == "dict":
             u = dict(zip(self.keys(), u, strict=True))
@@ -138,8 +161,9 @@ class ForwardModel(Model):
             pred.append(self.forward(p, *args, **kwargs))
         return np.array(pred)
 
-
-    def get_posterior_pred(self, chains: dict | ArrayLike, n_samples: int, *args, **kwargs) -> np.ndarray:
+    def get_posterior_pred(
+        self, chains: dict | ArrayLike, n_samples: int, *args, **kwargs
+    ) -> np.ndarray:
         if isinstance(chains, dict):
             chains = np.array([a for a in chains.values()])
         elif chains.ndim != 2 or chains.shape[0] != len(self.keys()):

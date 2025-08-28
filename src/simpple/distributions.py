@@ -8,7 +8,7 @@ from collections.abc import Callable
 import numpy as np
 from numpy.random import Generator
 from numpy.typing import ArrayLike
-from scipy.stats import rv_continuous, norm
+from scipy.stats import rv_continuous, norm, uniform
 
 
 class Distribution(ABC):
@@ -113,6 +113,8 @@ class ScipyDistribution(Distribution):
         :param u: Uniform samples between 0 and 1
         :return: Transformed samples
         """
+        if np.any(np.logical_or(u < 0.0, u > 1.0)):
+            raise ValueError("Prior transform expects values between 0 and 1.")
         return self.dist.ppf(u, **kwargs)
 
     def sample(
@@ -142,6 +144,13 @@ class Uniform(Distribution):
             raise ValueError(
                 "lower bound should be lower than upper bound for uniform distribution"
             )
+        # The scipy distribution is always useful for nautilus
+        self._dist = uniform(self.low, self.high - self.low)
+
+    @property
+    def dist(self):
+        """Corresponding scipy uniform distribution"""
+        return self._dist
 
     def __repr__(self) -> str:
         return f"Uniform(low={self.low}, high={self.high})"
@@ -153,7 +162,7 @@ class Uniform(Distribution):
         :return: Log probability value(s)
         """
         lp = np.where(
-            np.logical_and(x >= self.low, x < self.high),
+            np.logical_and(np.greater_equal(x, self.low), np.less(x, self.high)),
             -np.log(self.high - self.low),
             -np.inf,
         )
@@ -182,4 +191,4 @@ class Normal(ScipyDistribution):
         super().__init__(norm(self.mu, self.sigma))
 
     def __repr__(self) -> str:
-        return f"Normal(mu={self.mu}, sigma={self.sigma})"
+        return f"Normal(mu={self.mu}, sigma{self.sigma})"

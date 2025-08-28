@@ -41,6 +41,9 @@ def test_prior_transform(dist, sp_dist):
     assert p.shape == u.shape
     np.testing.assert_allclose(p, sp_dist.ppf(u))
 
+    with pytest.raises(ValueError):
+        dist.prior_transform(1.2)
+
 @pytest.mark.parametrize("dist,sp_dist", list(DISTRIBUTIONS.items()))
 def test_sample(dist, sp_dist):
     n_samples = 1_000_000
