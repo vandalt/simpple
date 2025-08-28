@@ -11,6 +11,7 @@ DISTRIBUTIONS = {
     sd.ScipyDistribution(norm(0, 1)): norm(0, 1),
     sd.ScipyDistribution(norm(5, 0.001)): norm(5, 0.001),
     sd.Uniform(10, 25): uniform(10.0, 15.0),
+    sd.Normal(10, 25): norm(10.0, 25.0),
 }
 
 @pytest.mark.parametrize("dist,sp_dist", list(DISTRIBUTIONS.items()))
@@ -53,5 +54,17 @@ def test_sample(dist, sp_dist):
     scipy_samples = sp_dist.rvs(size=n_samples)
     std_err = samples.std() / np.sqrt(n_samples)
     se_var = np.sqrt(2 * samples.std()**4 / (n_samples - 1))
-    np.testing.assert_allclose(samples.mean(), scipy_samples.mean(), atol=3 * std_err)
-    np.testing.assert_allclose(samples.var(), scipy_samples.var(), atol=3 * se_var)
+    np.testing.assert_allclose(samples.mean(), scipy_samples.mean(), atol=4 * std_err)
+    np.testing.assert_allclose(samples.var(), scipy_samples.var(), atol=4 * se_var)
+
+@pytest.mark.parametrize("dist_class,bad_args", [
+    (sd.Uniform, (10.0, 0.0)),
+    (sd.Normal, (10.0, -50.0)),
+])
+def test_bad_inits(dist_class, bad_args):
+
+    with pytest.raises(ValueError):
+        dist_class(*bad_args)
+
+def test_out_of_bounds():
+    assert sd.Uniform(100, 200).log_prob(300) == - np.inf

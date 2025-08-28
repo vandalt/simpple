@@ -8,7 +8,7 @@ from collections.abc import Callable
 import numpy as np
 from numpy.random import Generator
 from numpy.typing import ArrayLike
-from scipy.stats import rv_continuous
+from scipy.stats import rv_continuous, norm
 
 
 class Distribution(ABC):
@@ -170,3 +170,16 @@ class Uniform(Distribution):
         if np.any(np.logical_or(u < 0.0, u > 1.0)):
             raise ValueError("Prior transform expects values between 0 and 1.")
         return self.low + (self.high - self.low) * u
+
+class Normal(ScipyDistribution):
+    def __init__(self, mu: float, sigma: float):
+        self.mu = mu
+        self.sigma = sigma
+        if self.sigma <= 0.0:
+            raise ValueError(
+                "Standard deviation sigma must be positive for normal distribution"
+            )
+        super().__init__(norm(self.mu, self.sigma))
+
+    def __repr__(self) -> str:
+        return f"Normal(mu={self.mu}, sigma={self.sigma})"
