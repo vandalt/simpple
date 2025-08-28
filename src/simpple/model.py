@@ -114,3 +114,41 @@ class Model:
         elif fmt != "array":
             raise ValueError(f"Invalid format: {fmt}. Use 'dict' or 'array'.")
         return self.prior_transform(u)
+
+
+class ForwardModel(Model):
+    """A model whose likelihood calls a forward model as the mean."""
+
+    forward: Callable
+
+    def __init__(self, parameters: dict, log_likelihood: Callable, forward: Callable):
+        super().__init__(parameters, log_likelihood)
+        self._forward = forward
+        self.forward.__func__.doc__ = self._forward.__doc__
+
+    def forward(self, parameters: dict | ArrayLike, *args, **kwargs) -> np.ndarray:
+        if not isinstance(parameters, dict):
+            parameters = dict(zip(self.keys(), parameters, strict=True))
+        return self._forward(parameters, *args, **kwargs)
+
+    def get_prior_pred(self, n_samples: int, *args, **kwargs) -> np.ndarray:
+        prior_params = self.get_prior_samples(n_samples, fmt="array")
+        pred = []
+        for p in prior_params.T:
+            pred.append(self.forward(p, *args, **kwargs))
+        return np.array(pred)
+
+
+    def get_posterior_pred(self, chains: dict | ArrayLike, n_samples: int, *args, **kwargs) -> np.ndarray:
+        if isinstance(chains, dict):
+            chains = np.array([a for a in chains.values()])
+        elif chains.ndim != 2 or chains.shape[0] != len(self.keys()):
+            raise ValueError("chains must have shape (ndim, nsamples)")
+
+        rng = np.random.default_rng()
+        show_idx = rng.choice(chains.shape[1], n_samples, replace=False)
+
+        pred = []
+        for i in show_idx:
+            pred.append(self.forward(chains[:, i], *args, **kwargs))
+        return np.array(pred)

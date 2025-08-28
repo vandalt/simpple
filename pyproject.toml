@@ -35,6 +35,8 @@ docs = [
   "myst-nb",
   "sphinx-book-theme",
   "corner",
+  "arviz",
+  "zeus-mcmc",
   "emcee",
   "tqdm",
   "ultranest",
