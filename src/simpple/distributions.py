@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 import numpy as np
+from numpy.random import Generator
 from numpy.typing import ArrayLike
 from scipy.stats import rv_continuous
 
@@ -114,7 +115,7 @@ class ScipyDistribution(Distribution):
     def sample(
         self,
         size: int | None = None,
-        seed: int | np.ndarray[int] | None = None,
+        seed: int | Generator | np.ndarray[int] | None = None,
         **kwargs,
     ) -> np.ndarray:
         """Draw samples from the distribution
@@ -125,5 +126,6 @@ class ScipyDistribution(Distribution):
         :param seed: Random seed to use
         :return: Random samples with shape `size`
         """
-        rng = np.random.default_rng(seed)
-        return self.dist.rvs(size=size, random_state=rng, **kwargs)
+        if not isinstance(seed, Generator):
+            seed = np.random.default_rng(seed=seed)
+        return self.dist.rvs(size=size, random_state=seed, **kwargs)
