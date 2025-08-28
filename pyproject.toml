@@ -33,6 +33,9 @@ docs = [
   "sphinx-book-theme",
 ]
 
+[tool.hatch.build.hooks.vcs]
+version-file = "src/simpple/_version.py"
+
 [project.urls]
 "Homepage" = "https://simpple.readthedocs.io"
 "Repository" = "https://github.com/vandalt/simpple"
