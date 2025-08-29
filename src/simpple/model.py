@@ -15,7 +15,7 @@ class Model:
     """Simpple model
 
     :param parameters: dictionary of parameters mapping parameter names to a
-                      prior (`simpple.Distribution` object).
+                      prior (``simpple.Distribution`` object).
     :param log_likelihood: log-likelihood function that accepts a dictionary of parameters.
     """
 
@@ -38,10 +38,19 @@ class Model:
         return len(self.keys())
 
     def keys(self) -> list[str]:
-        """Get a list of parameter names"""
+        """Get the ordered list of parameter names"""
         return list(self.parameters.keys())
 
-    def log_likelihood(self, parameters, *args, **kwargs):
+    def log_likelihood(self, parameters: dict | ArrayLike, *args, **kwargs) -> float:
+        """Calculate the log-likelihood of the model
+
+        Internally, this wraps the ``log_likelihood`` function that was given at initialization
+        and passes all arguments to it.
+
+        :param parameters: Dictionary or array of parameters. If an array is used,
+                           the order must be the same as ``Model.keys()``
+        :return: The log-likelihood value at ``parameters``.
+        """
         if not isinstance(parameters, dict):
             parameters = dict(zip(self.keys(), parameters, strict=True))
         return self._log_likelihood(parameters, *args, **kwargs)
@@ -50,7 +59,7 @@ class Model:
         """Log of the prior probability for the model
 
         :param parameters: Dictionary or array of parameters. If an array is used,
-                           the order must be the same as `Model.keys()`
+                           the order must be the same as ``Model.keys()``
         :return: Log-prior probability
         """
         if not isinstance(parameters, dict):
@@ -68,7 +77,7 @@ class Model:
         for all parameters and returns samples transformed according to the prior.
 
         :param u: Samples from the uniform distribution. Can be a dict or an array
-                  ordered as `Model.keys()`
+                  ordered as ``Model.keys()``
         :return: Prior samples, as a dict or an array depending on the input type.
         """
         is_dict = isinstance(u, dict)
@@ -87,7 +96,7 @@ class Model:
         return x
 
     def nautilus_prior(self) -> "Prior":
-        """Builds and return a `nautilus.Prior` for the model.
+        """Builds and return a ``nautilus.Prior`` for the model.
 
         :return: Nautilus Prior object.
         """
@@ -107,7 +116,9 @@ class Model:
     def log_prob(self, parameters: dict | ArrayLike, *args, **kwargs) -> float:
         """Log posterior probability for the model
 
-        :param parameters: Parameters as a dict or an array ordered as `Model.keys()`
+        All extra arguments are passed to the ``self.log_likelihood()``.
+
+        :param parameters: Parameters as a dict or an array ordered as ``Model.keys()``
         :return: Log posterior probability
         """
         if not isinstance(parameters, dict):
@@ -123,7 +134,7 @@ class Model:
         n_samples: int,
         fmt: str = "dict",
         seed: int | Generator | np.ndarray[int] | None = None,
-    ) -> dict:
+    ) -> dict | np.ndarray:
         """Generate prior samples for all parameters
 
         :param n_samples: Number of samples
@@ -140,21 +151,45 @@ class Model:
 
 
 class ForwardModel(Model):
-    """A model whose likelihood calls a forward model as the mean."""
+    """A model whose likelihood calls a forward model as the mean.
 
-    forward: Callable
+    :param parameters: dictionary of parameters mapping parameter names to a
+                      prior (``simpple.Distribution`` object).
+    :param log_likelihood: log-likelihood function that accepts a dictionary of parameters. This function should call ``forward``.
+    :param forward: Forward model function that accepts a dictionary of parameters as first argument.
+    """
 
     def __init__(self, parameters: dict, log_likelihood: Callable, forward: Callable):
         super().__init__(parameters, log_likelihood)
         self._forward = forward
         self.forward.__func__.doc__ = self._forward.__doc__
 
+    def _forward(self, parameters, *args, **kwargs) -> float:
+        raise NotImplementedError(
+            "forward must be passed to init or _forward must be "
+            "implemented by subclasses."
+        )
+
     def forward(self, parameters: dict | ArrayLike, *args, **kwargs) -> np.ndarray:
+        """Evaluate the forward model
+
+        Internally, this wraps the ``forward`` function that was given at initialization
+        and passes all arguments to it.
+
+        :param parameters: Dictionary or array of parameters. If an array is used,
+                           the order must be the same as ``Model.keys()``
+        :return: The forward model evalulated at ``parameters``.
+        """
         if not isinstance(parameters, dict):
             parameters = dict(zip(self.keys(), parameters, strict=True))
         return self._forward(parameters, *args, **kwargs)
 
     def get_prior_pred(self, n_samples: int, *args, **kwargs) -> np.ndarray:
+        """Get prior predictive samples
+        
+        :param n_samples: Number of samples to generate
+        :return: Forward model realizations corresponding to prior samples
+        """
         prior_params = self.get_prior_samples(n_samples, fmt="array")
         pred = []
         for p in prior_params.T:
@@ -164,6 +199,15 @@ class ForwardModel(Model):
     def get_posterior_pred(
         self, chains: dict | ArrayLike, n_samples: int, *args, **kwargs
     ) -> np.ndarray:
+        """Get posterior predictive samples
+
+        :param chains: Posterior chains organized as a dictionary or an array.
+                       If an array, should have shape ``(ndim, nsamples)`` where
+                       nsamples is the total number of samples in the chain and
+                       unrelated to the ``n_samples`` argument below.
+        :param n_samples: Number of samples to pick from the chains.
+        :return: Forward model realizations corresponding to posterior samples
+        """
         if isinstance(chains, dict):
             chains = np.array([a for a in chains.values()])
         elif chains.ndim != 2 or chains.shape[0] != len(self.keys()):
