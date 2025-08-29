@@ -8,7 +8,7 @@ from collections.abc import Callable
 import numpy as np
 from numpy.random import Generator
 from numpy.typing import ArrayLike
-from scipy.stats import rv_continuous, norm, uniform
+from scipy.stats import loguniform, rv_continuous, norm, truncnorm, uniform
 
 
 class Distribution(ABC):
@@ -180,6 +180,7 @@ class Uniform(Distribution):
             raise ValueError("Prior transform expects values between 0 and 1.")
         return self.low + (self.high - self.low) * u
 
+
 class Normal(ScipyDistribution):
     def __init__(self, mu: float, sigma: float):
         self.mu = mu
@@ -191,4 +192,47 @@ class Normal(ScipyDistribution):
         super().__init__(norm(self.mu, self.sigma))
 
     def __repr__(self) -> str:
-        return f"Normal(mu={self.mu}, sigma{self.sigma})"
+        return f"Normal(mu={self.mu}, sigma={self.sigma})"
+
+
+class LogUniform(ScipyDistribution):
+    def __init__(self, low: float, high: float):
+        self.low = low
+        self.high = high
+        if self.low > self.high:
+            raise ValueError(
+                "lower bound should be lower than upper bound for uniform distribution"
+            )
+        if self.low <= 0 or self.high <= 0:
+            raise ValueError("Bounds of the log-uniform distribution must be positive.")
+        super().__init__(loguniform(self.low, self.high))
+
+    def __repr__(self) -> str:
+        return f"LogUniform(low={self.low}, high={self.high})"
+
+
+class TruncatedNormal(ScipyDistribution):
+    def __init__(
+        self,
+        mu: float,
+        sigma: float,
+        low: float | None = None,
+        high: float | None = None,
+    ):
+        self.mu = mu
+        self.sigma = sigma
+        self.low = -np.inf if low is None else low
+        self.high = np.inf if high is None else high
+        if self.sigma <= 0.0:
+            raise ValueError(
+                "Standard deviation sigma must be positive for truncated normal distribution"
+            )
+        if self.low > self.high:
+            raise ValueError(
+                "lower bound should be lower than upper bound for uniform distribution"
+            )
+        a, b = (self.low - self.mu) / self.sigma, (self.high - self.mu) / self.sigma
+        super().__init__(truncnorm(a=a, b=b, loc=self.mu, scale=self.sigma))
+
+    def __repr__(self) -> str:
+        return f"TruncatedNormal(mu={self.mu}, sigma={self.sigma})"
