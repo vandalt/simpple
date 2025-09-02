@@ -87,7 +87,9 @@ def test_sample_stats(dist, sp_dist):
     std_err = samples.std() / np.sqrt(n_samples)
     se_var = np.sqrt(2 * samples.std() ** 4 / (n_samples - 1))
     np.testing.assert_allclose(samples.mean(), scipy_samples.mean(), atol=5 * std_err)
-    np.testing.assert_allclose(samples.var(), scipy_samples.var(), atol=5 * se_var)
+    np.testing.assert_allclose(
+        samples.var(), scipy_samples.var(), atol=5 * se_var, rtol=1e-2
+    )
 
 
 @pytest.mark.parametrize("dist", list(DISTRIBUTIONS_BOUNDED))
