@@ -201,7 +201,7 @@ class LogUniform(ScipyDistribution):
         self.high = high
         if self.low > self.high:
             raise ValueError(
-                "lower bound should be lower than upper bound for uniform distribution"
+                "lower bound should be lower than upper bound for log-uniform distribution"
             )
         if self.low <= 0 or self.high <= 0:
             raise ValueError("Bounds of the log-uniform distribution must be positive.")
