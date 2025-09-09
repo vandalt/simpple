@@ -5,4 +5,5 @@
 
 getting-started
 fitting-a-line
+writing-model-classes
 ```
