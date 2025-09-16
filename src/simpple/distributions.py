@@ -65,6 +65,10 @@ class Distribution(ABC):
 class ScipyDistribution(Distribution):
     """Distribution based on a scipy random variable.
 
+    .. note::
+
+        While this class can be convenient, custom ``log_prob()`` and ``prior_transform()`` functions written with Numpy are usually faster.
+
     :param dist: Scipy random variable (RV), either already instantiated or not.
                  If the RV is not instantiated, it will be during init and all args
                  and kwargs are passed to it.
