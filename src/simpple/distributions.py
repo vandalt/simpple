@@ -113,7 +113,7 @@ class ScipyDistribution(Distribution):
     def prior_transform(self, u: float | ArrayLike, **kwargs) -> float | np.ndarray:
         """Prior transform (inverse CDF) for nested sampling
 
-        Calls the scipy distributiion's `ppf()` (percent point function).
+        Calls the scipy distributiion's ``ppf()`` (percent point function).
 
         :param u: Uniform samples between 0 and 1
         :return: Transformed samples
@@ -130,10 +130,10 @@ class ScipyDistribution(Distribution):
     ) -> np.ndarray:
         """Draw samples from the distribution
 
-        Calls the scipy distribution's `rvs()` method.
+        Calls the scipy distribution's ``rvs()`` method.
 
         :param size: Shape of the samples
-        :param seed: Random seed to use
+        :param seed: Random seed to use (int or numpy generator)
         :return: Random samples with shape `size`
         """
         if not isinstance(seed, Generator):
@@ -141,7 +141,21 @@ class ScipyDistribution(Distribution):
         return self.dist.rvs(size=size, random_state=seed, **kwargs)
 
 
-class Uniform(Distribution):
+class Uniform(ScipyDistribution):
+    r"""Uniform distribution
+
+    .. math::
+
+        p(x) =
+            \begin{cases}
+                \frac{1}{b - a} & \text{if } a \leq x < b \\
+                0 & \text{otherwise}
+            \end{cases}
+
+    :param low: Lower bound (b)
+    :param high: Upper bound (a)
+    """
+
     def __init__(self, low: float, high: float):
         self.low = low
         self.high = high
@@ -149,13 +163,7 @@ class Uniform(Distribution):
             raise ValueError(
                 "lower bound should be lower than upper bound for uniform distribution"
             )
-        # The scipy distribution is always useful for nautilus
-        self._dist = uniform(self.low, self.high - self.low)
-
-    @property
-    def dist(self):
-        """Corresponding scipy uniform distribution"""
-        return self._dist
+        super().__init__(uniform(self.low, self.high - self.low))
 
     def __repr__(self) -> str:
         return f"Uniform(low={self.low}, high={self.high})"
@@ -187,6 +195,16 @@ class Uniform(Distribution):
 
 
 class Normal(ScipyDistribution):
+    r"""Normal distribution
+
+    .. math::
+
+        p(x) = \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left( -\frac{(x - \mu)^2}{2\sigma^2} \right)
+
+    :param mu: Mean :math:`\mu`
+    :param sigma: Standard deviation :math:`\sigma`
+    """
+
     def __init__(self, mu: float, sigma: float):
         self.mu = mu
         self.sigma = sigma
@@ -197,7 +215,7 @@ class Normal(ScipyDistribution):
         super().__init__(norm(self.mu, self.sigma))
 
     def log_prob(self, x: float | ArrayLike, *args, **kwargs) -> np.ndarray:
-        """Log probability density function.
+        """Log probability density function of the normal distribution
 
         :param x: Value(s) at which to evaluate the log probability.
         :return: Log probability value(s)
@@ -207,6 +225,11 @@ class Normal(ScipyDistribution):
         )
 
     def prior_transform(self, u: float | ArrayLike) -> np.ndarray:
+        r"""Prior transform (inverse CDF) of the normal distribution.
+
+        :param u: Uniform samples between 0 and 1
+        :return: Transformed samples centered around :math:`\mu` with standard deviation :math:`\simga`.
+        """
         if np.any(np.logical_or(u < 0.0, u > 1.0)):
             raise ValueError("Prior transform expects values between 0 and 1.")
         return self.mu + self.sigma * np.sqrt(2) * erfinv(2 * u - 1)
@@ -216,6 +239,20 @@ class Normal(ScipyDistribution):
 
 
 class LogUniform(ScipyDistribution):
+    r"""Log-uniform distribution
+
+    .. math::
+
+        p(x) =
+            \begin{cases}
+                \frac{1}{x \ln(b/a)} & \text{if } a \leq x < b \\
+                0 & \text{otherwise}
+            \end{cases}
+
+    :param low: Lower bound (b)
+    :param high: Upper bound (a)
+    """
+
     def __init__(self, low: float, high: float):
         self.low = low
         self.high = high
@@ -228,6 +265,11 @@ class LogUniform(ScipyDistribution):
         super().__init__(loguniform(self.low, self.high))
 
     def log_prob(self, x: float | ArrayLike) -> np.ndarray:
+        """Log-probability for the log-uniform distribution
+
+        :param x: Value(s) at which to evaluate the log probability.
+        :return: Log probability value(s)
+        """
         lp = np.where(
             np.logical_and(np.greater_equal(x, self.low), np.less(x, self.high)),
             -np.log(x * np.log(self.high / self.low)),
@@ -238,6 +280,11 @@ class LogUniform(ScipyDistribution):
         return lp
 
     def prior_transform(self, u: float | ArrayLike) -> np.ndarray:
+        """Prior transform (inverse CDF) of the log-uniform distribution.
+
+        :param u: Uniform samples between 0 and 1
+        :return: Transformed samples on a logarithmic scale between `self.low` and `self.high`
+        """
         if np.any(np.logical_or(u < 0.0, u > 1.0)):
             raise ValueError("Prior transform expects values between 0 and 1.")
         return self.low * np.exp(u * np.log(self.high / self.low))
@@ -247,6 +294,24 @@ class LogUniform(ScipyDistribution):
 
 
 class TruncatedNormal(ScipyDistribution):
+    r"""
+    .. math::
+
+        f(x; \mu, \sigma, a, b) =
+            \begin{cases}
+                \dfrac{1}{\sigma} \dfrac{\phi\left(\frac{x - \mu}{\sigma}\right)}
+                {\Phi\left(\frac{b - \mu}{\sigma}\right) - \Phi\left(\frac{a - \mu}{\sigma}\right)}
+                & \text{if } a \leq x \leq b \\
+                0 & \text{otherwise}
+            \end{cases}
+
+    where :math:`\phi` is the standard normal distribution and :math:`\Phi` the standard normal CDF [1]_.
+
+    .. rubric:: Footnotes
+
+    .. [1] https://en.wikipedia.org/wiki/Truncated_normal_distribution
+    """
+
     def __init__(
         self,
         mu: float,
@@ -296,7 +361,7 @@ class TruncatedNormal(ScipyDistribution):
         """Prior transform (inverse CDF) of the truncated distribution.
 
         :param u: Uniform samples between 0 and 1
-        :return: Transformed samples between `self.low` and `self.high`
+        :return: Transformed samples between `self.low` and `self.high` following a normal distribution
         """
         if np.any(np.logical_or(u < 0.0, u > 1.0)):
             raise ValueError("Prior transform expects values between 0 and 1.")
@@ -306,6 +371,14 @@ class TruncatedNormal(ScipyDistribution):
 
 
 class Fixed(Distribution):
+    """Fixed distribution
+
+    This is essentially a delta function centered on ``value``.
+    Is handled as a special case in :class:`simpple.model.Model` to avoid inefficient sampling.
+
+    :param value: Value to which the parameter is fixed.
+    """
+
     def __init__(self, value: float):
         self.value = value
 
@@ -313,6 +386,13 @@ class Fixed(Distribution):
         return f"Fixed(value={self.value})"
 
     def log_prob(self, x: float | ArrayLike) -> float | np.narray:
+        """Log probability of a fixed variable.
+
+        Returns ``np.inf`` at ``value`` and ``-np.inf`` elsewhere.
+
+        :param x: Value(s) at which to evaluate the log probability.
+        :return: Log probability value(s)
+        """
         lp = np.where(
             x == self.value,
             np.inf,
@@ -323,6 +403,11 @@ class Fixed(Distribution):
         return lp
 
     def prior_transform(self, u: float | ArrayLike) -> float | np.ndarray:
+        """Prior transform (inverse CDF) of the fixed distribution
+
+        :param u: Uniform samples between 0 and 1
+        :return: Transformed samples, all at ``value``.
+        """
         if np.any(np.logical_or(u < 0.0, u > 1.0)):
             raise ValueError("Prior transform expects values between 0 and 1.")
         return np.full_like(u, self.value)
