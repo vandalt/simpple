@@ -7,6 +7,8 @@ import numpy as np
 from numpy.random import Generator
 from numpy.typing import ArrayLike
 
+from simpple.distributions import Distribution, Fixed
+
 if TYPE_CHECKING:
     from nautilus import Prior
 
@@ -19,12 +21,26 @@ class Model:
     :param log_likelihood: log-likelihood function that accepts a dictionary of parameters.
     """
 
-    def __init__(self, parameters: dict, log_likelihood: Callable):
+    def __init__(
+        self,
+        parameters: dict[str, Distribution],
+        log_likelihood: Callable | None = None,
+    ):
         self.parameters = parameters
-        self._log_likelihood = log_likelihood
-        # Attempt to make log-likelihood inherit docstring.
-        # Works at runtime but not for static (LSP) tools
-        self.log_likelihood.__func__.__doc__ = self._log_likelihood.__doc__
+        if log_likelihood is not None:
+            self._log_likelihood = log_likelihood
+            # Attempt to make log-likelihood inherit docstring.
+            # Works at runtime but not for static (LSP) tools
+            self.log_likelihood.__func__.__doc__ = self._log_likelihood.__doc__
+        self.fixed_p = {}
+        self.fixed_p_vals = {}
+        self.vary_p = {}
+        for pname, pdist in self.parameters.items():
+            if isinstance(pdist, Fixed):
+                self.fixed_p[pname] = pdist
+                self.fixed_p_vals[pname] = pdist.value
+            else:
+                self.vary_p[pname] = pdist
 
     def _log_likelihood(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(
@@ -37,9 +53,12 @@ class Model:
         """Number of dimensions (parameters) in the model"""
         return len(self.keys())
 
-    def keys(self) -> list[str]:
+    def keys(self, fixed: bool = False) -> list[str]:
         """Get the ordered list of parameter names"""
-        return list(self.parameters.keys())
+        if fixed:
+            return list(self.parameters.keys())
+        else:
+            return list(self.vary_p.keys())
 
     def log_likelihood(self, parameters: dict | ArrayLike, *args, **kwargs) -> float:
         """Calculate the log-likelihood of the model
@@ -53,6 +72,8 @@ class Model:
         """
         if not isinstance(parameters, dict):
             parameters = dict(zip(self.keys(), parameters, strict=True))
+        # RHS has precedence
+        parameters = self.fixed_p_vals | parameters
         return self._log_likelihood(parameters, *args, **kwargs)
 
     def log_prior(self, parameters: dict | ArrayLike) -> float:
@@ -66,6 +87,9 @@ class Model:
             parameters = dict(zip(self.keys(), parameters, strict=True))
         lp = 0.0
         for pname, pval in parameters.items():
+            # Skip fixed parameters
+            if pname in self.fixed_p:
+                continue
             pdist = self.parameters[pname]
             lp += pdist.log_prob(pval)
         return lp
@@ -104,6 +128,8 @@ class Model:
 
         prior = Prior()
         for pname, pdist in self.parameters.items():
+            if isinstance(pdist, Fixed):
+                continue
             if not hasattr(pdist, "dist"):
                 raise AttributeError(
                     f"distribution {pdist} for parameter {pname} has no scipy distribution. "
@@ -123,6 +149,8 @@ class Model:
         """
         if not isinstance(parameters, dict):
             parameters = dict(zip(self.keys(), parameters, strict=True))
+        # RHS has precedence
+        parameters = self.fixed_p_vals | parameters
 
         lp = self.log_prior(parameters)
         if np.isfinite(lp):
@@ -159,10 +187,16 @@ class ForwardModel(Model):
     :param forward: Forward model function that accepts a dictionary of parameters as first argument.
     """
 
-    def __init__(self, parameters: dict, log_likelihood: Callable, forward: Callable):
-        super().__init__(parameters, log_likelihood)
-        self._forward = forward
-        self.forward.__func__.doc__ = self._forward.__doc__
+    def __init__(
+        self,
+        parameters: dict,
+        log_likelihood: Callable | None = None,
+        forward: Callable | None = None,
+    ):
+        super().__init__(parameters, log_likelihood=log_likelihood)
+        if forward is not None:
+            self._forward = forward
+            self.forward.__func__.doc__ = self._forward.__doc__
 
     def _forward(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(
@@ -182,11 +216,13 @@ class ForwardModel(Model):
         """
         if not isinstance(parameters, dict):
             parameters = dict(zip(self.keys(), parameters, strict=True))
+        # RHS has precedence
+        parameters = self.fixed_p_vals | parameters
         return self._forward(parameters, *args, **kwargs)
 
     def get_prior_pred(self, n_samples: int, *args, **kwargs) -> np.ndarray:
         """Get prior predictive samples
-        
+
         :param n_samples: Number of samples to generate
         :return: Forward model realizations corresponding to prior samples
         """
