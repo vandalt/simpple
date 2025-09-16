@@ -50,11 +50,15 @@ class Model:
 
     @property
     def ndim(self):
-        """Number of dimensions (parameters) in the model"""
+        """Number of dimensions (**variable** parameters) in the model"""
         return len(self.keys())
 
     def keys(self, fixed: bool = False) -> list[str]:
-        """Get the ordered list of parameter names"""
+        """Get the ordered list of parameter names
+
+        :param fixed: Whether fixed parameters should be included. Defaults to ``False``.
+        :return: List of parameter names
+        """
         if fixed:
             return list(self.parameters.keys())
         else:
@@ -67,7 +71,8 @@ class Model:
         and passes all arguments to it.
 
         :param parameters: Dictionary or array of parameters. If an array is used,
-                           the order must be the same as ``Model.keys()``
+                           the order must be the same as ``Model.keys()``, without the fixed parameters.
+                           Dictionaries can optionally include fixed parameter.s
         :return: The log-likelihood value at ``parameters``.
         """
         if not isinstance(parameters, dict):
@@ -80,7 +85,8 @@ class Model:
         """Log of the prior probability for the model
 
         :param parameters: Dictionary or array of parameters. If an array is used,
-                           the order must be the same as ``Model.keys()``
+                           the order must be the same as ``Model.keys()``, without the fixed parameters.
+                           Fixed parameters are always ignored even in dictionaries.
         :return: Log-prior probability
         """
         if not isinstance(parameters, dict):
@@ -94,26 +100,30 @@ class Model:
             lp += pdist.log_prob(pval)
         return lp
 
-    def prior_transform(self, u: ArrayLike | dict) -> np.ndarray | dict:
+    def prior_transform(
+        self, u: ArrayLike | dict, fixed: bool = False
+    ) -> np.ndarray | dict:
         """Prior transform of the model
 
         Takes samples from a uniform distribution between 0 and 1
         for all parameters and returns samples transformed according to the prior.
 
         :param u: Samples from the uniform distribution. Can be a dict or an array
-                  ordered as ``Model.keys()``
+                  ordered as ``Model.keys()``.
+        :param fixed: Whether fixed parameters should be included. Defaults to False.
         :return: Prior samples, as a dict or an array depending on the input type.
         """
         is_dict = isinstance(u, dict)
         if is_dict:
             # Using loop over keys instead of list ensures keys are correct
-            u = np.array([u[k] for k in self.keys()])
+            u = np.array([u[k] for k in self.keys(fixed=fixed)])
         x = np.array(u)
         if x.shape[0] != self.ndim:
             raise ValueError(
                 f"Expected {self.ndim} elements for the transform, got {x.shape[0]}"
             )
-        for i, pdist in enumerate(self.parameters.values()):
+        pdist_list = self.parameters.values() if fixed else self.vary_p.values()
+        for i, pdist in enumerate(pdist_list):
             x[i] = pdist.prior_transform(u[i])
         if is_dict:
             x = dict(zip(self.keys(), x, strict=True))
@@ -121,6 +131,8 @@ class Model:
 
     def nautilus_prior(self) -> "Prior":
         """Builds and return a ``nautilus.Prior`` for the model.
+
+        Fixed parameters are not included.
 
         :return: Nautilus Prior object.
         """
@@ -144,7 +156,9 @@ class Model:
 
         All extra arguments are passed to the ``self.log_likelihood()``.
 
-        :param parameters: Parameters as a dict or an array ordered as ``Model.keys()``
+        :param parameters: Dictionary or array of parameters. If an array is used,
+                           the order must be the same as ``Model.keys()``, without the fixed parameters.
+                           Dictionaries can optionally include fixed parameter.s
         :return: Log posterior probability
         """
         if not isinstance(parameters, dict):
@@ -162,11 +176,13 @@ class Model:
         n_samples: int,
         fmt: str = "dict",
         seed: int | Generator | np.ndarray[int] | None = None,
+        fixed: bool = False,
     ) -> dict | np.ndarray:
         """Generate prior samples for all parameters
 
         :param n_samples: Number of samples
         :param fmt: Format of the samples (dict or array)
+        :param fixed: Whether fixed parameters should be included. Defaults to False.
         :return: Dictionary of prior samples
         """
         rng = np.random.default_rng(seed=seed)
@@ -175,7 +191,7 @@ class Model:
             u = dict(zip(self.keys(), u, strict=True))
         elif fmt != "array":
             raise ValueError(f"Invalid format: {fmt}. Use 'dict' or 'array'.")
-        return self.prior_transform(u)
+        return self.prior_transform(u, fixed=fixed)
 
 
 class ForwardModel(Model):
@@ -211,7 +227,8 @@ class ForwardModel(Model):
         and passes all arguments to it.
 
         :param parameters: Dictionary or array of parameters. If an array is used,
-                           the order must be the same as ``Model.keys()``
+                           the order must be the same as ``Model.keys()``, without the fixed parameters.
+                           Dictionaries can optionally include fixed parameter.s
         :return: The forward model evalulated at ``parameters``.
         """
         if not isinstance(parameters, dict):
