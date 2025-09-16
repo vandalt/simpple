@@ -115,3 +115,22 @@ def test_bad_inits(dist_class, bad_args):
 
 def test_out_of_bounds():
     assert sd.Uniform(100, 200).log_prob(300) == -np.inf
+
+
+def test_fixed_distribution():
+    val = 1.0
+    fd = sd.Fixed(val)
+
+    assert fd.value == val
+
+    assert fd.log_prob(val) == np.inf
+    assert fd.log_prob(1.2) == -np.inf
+
+    rng = np.random.default_rng()
+
+    random_vals = rng.uniform(-100, 100, size=10_000)
+    assert np.all(~np.isfinite(fd.log_prob(random_vals)))
+
+    u_vals = rng.uniform(size=10_000)
+    p_vals = fd.prior_transform(u_vals)
+    np.testing.assert_equal(p_vals, val)
