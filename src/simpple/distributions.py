@@ -1,4 +1,4 @@
-# Required so ArrayLike does not look terrible
+# Required so ArrayLike does not look terrible in docs
 from __future__ import annotations
 
 import warnings
@@ -9,6 +9,7 @@ import numpy as np
 from numpy.random import Generator
 from numpy.typing import ArrayLike
 from scipy.stats import loguniform, rv_continuous, norm, truncnorm, uniform
+from scipy.special import erfinv, erf
 
 
 class Distribution(ABC):
@@ -191,6 +192,21 @@ class Normal(ScipyDistribution):
             )
         super().__init__(norm(self.mu, self.sigma))
 
+    def log_prob(self, x: float | ArrayLike, *args, **kwargs) -> np.ndarray:
+        """Log probability density function.
+
+        :param x: Value(s) at which to evaluate the log probability.
+        :return: Log probability value(s)
+        """
+        return -0.5 * (
+            np.log(2 * np.pi * self.sigma**2) + ((x - self.mu) / self.sigma) ** 2
+        )
+
+    def prior_transform(self, u: float | ArrayLike) -> np.ndarray:
+        if np.any(np.logical_or(u < 0.0, u > 1.0)):
+            raise ValueError("Prior transform expects values between 0 and 1.")
+        return self.mu + self.sigma * np.sqrt(2) * erfinv(2 * u - 1)
+
     def __repr__(self) -> str:
         return f"Normal(mu={self.mu}, sigma={self.sigma})"
 
@@ -206,6 +222,21 @@ class LogUniform(ScipyDistribution):
         if self.low <= 0 or self.high <= 0:
             raise ValueError("Bounds of the log-uniform distribution must be positive.")
         super().__init__(loguniform(self.low, self.high))
+
+    def log_prob(self, x: float | ArrayLike) -> np.ndarray:
+        lp = np.where(
+            np.logical_and(np.greater_equal(x, self.low), np.less(x, self.high)),
+            -np.log(x * np.log(self.high / self.low)),
+            -np.inf,
+        )
+        if lp.ndim == 0:
+            return lp.item()
+        return lp
+
+    def prior_transform(self, u: float | ArrayLike) -> np.ndarray:
+        if np.any(np.logical_or(u < 0.0, u > 1.0)):
+            raise ValueError("Prior transform expects values between 0 and 1.")
+        return self.low * np.exp(u * np.log(self.high / self.low))
 
     def __repr__(self) -> str:
         return f"LogUniform(low={self.low}, high={self.high})"
@@ -236,3 +267,58 @@ class TruncatedNormal(ScipyDistribution):
 
     def __repr__(self) -> str:
         return f"TruncatedNormal(mu={self.mu}, sigma={self.sigma})"
+
+    def log_prob(self, x: float | ArrayLike, *args, **kwargs) -> np.ndarray:
+        """Log probability density function.
+
+        :param x: Value(s) at which to evaluate the log probability.
+        :return: Log probability value(s)
+        """
+        phi_low = 0.5 * (1 + erf((self.low - self.mu) / self.sigma / np.sqrt(2)))
+        phi_high = 0.5 * (1 + erf((self.high - self.mu) / self.sigma / np.sqrt(2)))
+        log_norm = -0.5 * (
+            np.log(2 * np.pi * self.sigma**2) + ((x - self.mu) / self.sigma) ** 2
+        )
+        lp = np.where(
+            np.logical_and(np.greater_equal(x, self.low), np.less(x, self.high)),
+            log_norm - np.log(phi_high - phi_low),
+            -np.inf,
+        )
+        if lp.ndim == 0:
+            return lp.item()
+        return lp
+
+    def prior_transform(self, u: float | ArrayLike) -> float | np.ndarray:
+        """Prior transform (inverse CDF) of the truncated distribution.
+
+        :param u: Uniform samples between 0 and 1
+        :return: Transformed samples between `self.low` and `self.high`
+        """
+        if np.any(np.logical_or(u < 0.0, u > 1.0)):
+            raise ValueError("Prior transform expects values between 0 and 1.")
+        a = erf((self.low - self.mu) / (self.sigma * np.sqrt(2)))
+        b = erf((self.high - self.mu) / (self.sigma * np.sqrt(2)))
+        return self.mu + self.sigma * np.sqrt(2) * erfinv((1 - u) * a + u * b)
+
+
+class Fixed(Distribution):
+    def __init__(self, value: float):
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"Fixed(value={self.value})"
+
+    def log_prob(self, x: float | ArrayLike) -> float | np.narray:
+        lp = np.where(
+            x == self.value,
+            np.inf,
+            -np.inf,
+        )
+        if lp.ndim == 0:
+            return lp.item()
+        return lp
+
+    def prior_transform(self, u: float | ArrayLike) -> float | np.ndarray:
+        if np.any(np.logical_or(u < 0.0, u > 1.0)):
+            raise ValueError("Prior transform expects values between 0 and 1.")
+        return np.full_like(u, self.value)
