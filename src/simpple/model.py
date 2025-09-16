@@ -118,15 +118,16 @@ class Model:
             # Using loop over keys instead of list ensures keys are correct
             u = np.array([u[k] for k in self.keys(fixed=fixed)])
         x = np.array(u)
-        if x.shape[0] != self.ndim:
+        n_expect = len(self.keys(fixed=fixed))
+        if x.shape[0] != n_expect:
             raise ValueError(
-                f"Expected {self.ndim} elements for the transform, got {x.shape[0]}"
+                f"Expected {n_expect} elements for the transform, got {x.shape[0]}"
             )
         pdist_list = self.parameters.values() if fixed else self.vary_p.values()
         for i, pdist in enumerate(pdist_list):
             x[i] = pdist.prior_transform(u[i])
         if is_dict:
-            x = dict(zip(self.keys(), x, strict=True))
+            x = dict(zip(self.keys(fixed=fixed), x, strict=True))
         return x
 
     def nautilus_prior(self) -> "Prior":
@@ -186,9 +187,9 @@ class Model:
         :return: Dictionary of prior samples
         """
         rng = np.random.default_rng(seed=seed)
-        u = rng.uniform(size=(len(self.parameters), n_samples))
+        u = rng.uniform(size=(len(self.keys(fixed=fixed)), n_samples))
         if fmt == "dict":
-            u = dict(zip(self.keys(), u, strict=True))
+            u = dict(zip(self.keys(fixed=fixed), u, strict=True))
         elif fmt != "array":
             raise ValueError(f"Invalid format: {fmt}. Use 'dict' or 'array'.")
         return self.prior_transform(u, fixed=fixed)
