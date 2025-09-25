@@ -1,6 +1,7 @@
 # Required so ArrayLike does not look terrible in docs
 from __future__ import annotations
 
+import inspect
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -24,6 +25,23 @@ class Distribution(ABC):
     @abstractmethod
     def __repr__(self) -> str:
         pass
+
+    @property
+    def required_args(self) -> list[str]:
+        sig = inspect.signature(self.__class__.__init__)
+        ignored_args = ["self", "args", "kwargs"]
+        required_args = [
+            pname
+            for pname, pval in sig.parameters.items()
+            if pname not in ignored_args and pval.default is pval.empty
+        ]
+        return required_args
+
+    def to_yaml_dict(self) -> dict:
+        yaml_dict = {}
+        yaml_dict["dist"] = self.__class__.__name__
+        yaml_dict["args"] = [getattr(self, arg) for arg in self.required_args]
+        return yaml_dict
 
     @abstractmethod
     def log_prob(self, x: float | ArrayLike) -> float | np.ndarray:
@@ -99,6 +117,20 @@ class ScipyDistribution(Distribution):
         kwargs_tuple = tuple(f"{k}={v}" for k, v in self.dist.kwds.items())
         signature_tuple = args_tuple + kwargs_tuple
         return f"ScipyDistribution({self.dist.dist.name}{signature_tuple})"
+
+    def to_yaml_dict(self) -> dict:
+        if type(self) is not ScipyDistribution:
+            return Distribution.to_yaml_dict(self)
+
+        yaml_dict = {}
+        yaml_dict["dist"] = self.__class__.__name__
+        dist_name = self.dist.dist.name
+        dist_args = self.dist.args
+        dist_kwargs = self.dist.kwds
+        yaml_dict["args"] = [dist_name] + list(dist_args)
+        yaml_dict["kwargs"] = dist_kwargs
+
+        return yaml_dict
 
     def log_prob(self, x: float | ArrayLike, *args, **kwargs) -> np.ndarray:
         """Log probability density function.

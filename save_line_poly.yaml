@@ -1,0 +1,22 @@
+class: PolyModel
+kwargs:
+  forward: PolyModel._forward
+  log_likelihood: PolyModel._log_likelihood
+parameters:
+  a0:
+    args:
+    - uniform
+    - -10
+    - 20
+    dist: ScipyDistribution
+    kwargs: {}
+  a1:
+    args:
+    - -10
+    - 10
+    dist: Uniform
+  sigma:
+    args:
+    - 1.0e-05
+    - 100
+    dist: LogUniform

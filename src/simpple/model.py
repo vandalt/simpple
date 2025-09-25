@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
+import yaml
 from numpy.random import Generator
 from numpy.typing import ArrayLike
 
 from simpple.distributions import Distribution, Fixed
+from simpple.load import get_func_str, parse_parameters, resolve, write_parameters
 
 if TYPE_CHECKING:
     from nautilus import Prior
 
 
+# TODO: Unit tests for YAML methods
 class Model:
     """Simpple model
 
@@ -41,6 +45,16 @@ class Model:
                 self.fixed_p_vals[pname] = pdist.value
             else:
                 self.vary_p[pname] = pdist
+
+    # TODO: Enable specifying the log-likelihood and forward in the model file?
+    @classmethod
+    def from_yaml(
+        cls, path: Path | str, log_likelihood: Callable | None = None
+    ) -> Model:
+        with open(path) as f:
+            mdict = yaml.safe_load(f)
+        parameters = parse_parameters(mdict["parameters"])
+        return cls(parameters, log_likelihood=log_likelihood)
 
     def _log_likelihood(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(
@@ -214,6 +228,40 @@ class ForwardModel(Model):
         if forward is not None:
             self._forward = forward
             self.forward.__func__.doc__ = self._forward.__doc__
+
+    # TODO: Share code by calling super()? Not sure how would handle extra kwargs then
+    @classmethod
+    def from_yaml(
+        cls,
+        path: Path | str,
+        **kwargs,
+    ) -> Model:
+        with open(path) as f:
+            mdict = yaml.safe_load(f)
+        parameters = parse_parameters(mdict["parameters"])
+        kwargs = mdict.get("kwargs", {}) | kwargs
+        func_names = ["log_likelihood", "forward"]
+        for kname in kwargs:
+            if kname in func_names and isinstance(kwargs[kname], str):
+                kwargs[kname] = resolve(kwargs[kname])
+        return cls(parameters, **kwargs)
+
+    def to_yaml(self, path: Path | str, overwrite: bool = False):
+        model_dict = {}
+        model_dict["class"] = self.__class__.__name__
+        model_dict["parameters"] = write_parameters(self.parameters)
+        kwargs_dict = {}
+        kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
+        kwargs_dict["forward"] = get_func_str(self._forward)
+        model_dict["kwargs"] = kwargs_dict
+
+        path = Path(path)
+        if path.exists() and not overwrite:
+            raise FileExistsError(
+                f"The file {path} already exists. Use overwrite=True to overwrite it."
+            )
+        with open(path, mode="w") as f:
+            yaml.dump(model_dict, f)
 
     def _forward(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(

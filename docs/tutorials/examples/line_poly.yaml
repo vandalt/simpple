@@ -1,12 +1,11 @@
-class: ForwardModel
+class: PolyModel
 kwargs:
-  log_likelihood: log_likelihood
-  forward: linear_model
+  order: 1
 parameters:
-  m:
+  a1:
     dist: Uniform
     args: [-10, 10]
-  b:
+  a0:
     dist: ScipyDistribution
     args:
       - uniform
