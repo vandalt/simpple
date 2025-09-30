@@ -111,6 +111,13 @@ class ScipyDistribution(Distribution):
                 )
             self._dist = dist
         elif isinstance(dist, rv_continuous):
+            if len(args) == 0 and len(kwargs) == 0:
+                warnings.warn(
+                    "The scipy distribution has no arguments and will use the default parameters."
+                    "Make sure this is what you want.",
+                    category=RuntimeWarning,
+                    stacklevel=2,
+                )
             self._dist = dist(*args, **kwargs)
         else:
             raise TypeError(f"Invalid type {type(dist)} for the scipy distribution.")

@@ -23,6 +23,49 @@ def get_subclasses(cls):
 DISTRIBUTIONS = get_subclasses(Distribution)
 
 
+def parse_parameters(pdict: dict) -> dict[str, Distribution]:
+    parameters = {}
+    for name, spec in pdict.items():
+        if "dist" not in spec:
+            raise KeyError(
+                "Distribution dictionaries should have a 'dist' key for the distribution name"
+            )
+        dist = spec["dist"]
+        args = spec.get("args", [])
+        kwargs = spec.get("kwargs", {})
+        if dist == "ScipyDistribution":
+            if len(args) > 0:
+                if isinstance(args, list):
+                    k = 0
+                elif isinstance(args, tuple):
+                    k = 0
+                    # Cannot assign to tuples so convert to list
+                    args = list(args)
+                elif isinstance(args, dict):
+                    k = "dist"
+                else:
+                    raise TypeError(
+                        "args for ScipyDistribution should be a list, tuple or a dict"
+                    )
+                args[k] = getattr(scipy.stats, args[k])
+            elif "dist" in kwargs:
+                kwargs["dist"] = getattr(scipy.stats, kwargs["dist"])
+            else:
+                raise ValueError(
+                    "ScipyDistribution should have a distribution specified in 'args' or 'kwargs'"
+                )
+        if dist not in DISTRIBUTIONS:
+            raise KeyError(
+                f"Distribution name '{dist}' not found. Available distributions are {DISTRIBUTIONS.keys()}"
+            )
+        dist_cls = DISTRIBUTIONS[dist]
+        if isinstance(args, (list, tuple)):
+            parameters[name] = dist_cls(*args, **kwargs)
+        elif isinstance(args, dict):
+            parameters[name] = dist_cls(**args, **kwargs)
+    return parameters
+
+
 def load_parameters(path: Path | str) -> dict[str, Distribution]:
     with open(path) as f:
         mdict = yaml.safe_load(f)
@@ -31,25 +74,6 @@ def load_parameters(path: Path | str) -> dict[str, Distribution]:
     else:
         pdict = mdict
     return parse_parameters(pdict)
-
-
-def parse_parameters(pdict: dict) -> dict[str, Distribution]:
-    parameters = {}
-    # TODO: Support kwargs
-    for name, spec in pdict.items():
-        dist = spec["dist"]
-        args = spec["args"]
-        if dist == "ScipyDistribution":
-            if isinstance(args, list):
-                k = 0
-            elif isinstance(args, dict):
-                k = "dist"
-            args[k] = getattr(scipy.stats, args[k])
-        if isinstance(args, list):
-            parameters[name] = DISTRIBUTIONS[spec["dist"]](*spec["args"])
-        elif isinstance(args, dict):
-            parameters[name] = DISTRIBUTIONS[spec["dist"]](**spec["args"])
-    return parameters
 
 
 def write_parameters(parameters: dict[str, Distribution]) -> dict:

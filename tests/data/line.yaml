@@ -1,0 +1,19 @@
+class: ForwardModel
+kwargs:
+  log_likelihood: log_likelihood
+  forward: linear_model
+parameters:
+  m:
+    dist: Uniform
+    args: [-10, 10]
+  b:
+    dist: ScipyDistribution
+    args:
+      - uniform
+      - -10
+      - 20
+  sigma:
+    dist: LogUniform
+    args:
+      low: 1.0e-5
+      high: 100

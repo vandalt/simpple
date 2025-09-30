@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 import numpy as np
 
@@ -7,6 +9,11 @@ from scipy.stats import loguniform, truncnorm, uniform, norm
 
 def x2z(x, loc, scale):
     return (x - loc) / scale
+
+
+def test_hash():
+    dist = sd.Uniform(-10.0, 10.0)
+    hash(dist)
 
 
 # Map distributions to scipy distributions for comparison
@@ -134,3 +141,20 @@ def test_fixed_distribution():
     u_vals = rng.uniform(size=10_000)
     p_vals = fd.prior_transform(u_vals)
     np.testing.assert_equal(p_vals, val)
+
+
+def test_scipy_warnings():
+    with pytest.warns(RuntimeWarning, match="The scipy distribution is 'frozen'"):
+        sd.ScipyDistribution(uniform(-5, 10), -8, 16)
+    with pytest.warns(
+        RuntimeWarning,
+        match="The scipy distribution has no arguments",
+    ):
+        sd.ScipyDistribution(uniform)
+
+
+@pytest.mark.parametrize("dist", list(DISTRIBUTIONS))
+def test_equal(dist):
+    assert dist == dist
+    dist_copy = copy.deepcopy(dist)
+    assert dist == dist_copy
