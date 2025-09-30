@@ -26,6 +26,14 @@ class Distribution(ABC):
     def __repr__(self) -> str:
         pass
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return self.__dict__ == other.__dict__
+
+    def __hash__(self):
+        return hash(tuple(sorted(self.__dict__.items())))
+
     @property
     def required_args(self) -> list[str]:
         sig = inspect.signature(self.__class__.__init__)
@@ -111,6 +119,34 @@ class ScipyDistribution(Distribution):
     def dist(self):
         """Underlying scipy distribution"""
         return self._dist
+
+    @property
+    def _comparison_dict(self):
+        full_dict = self.__dict__
+        comp_dict = {}
+        for k in full_dict:
+            if k != "_dist":
+                comp_dict[k] = full_dict[k]
+                continue
+            dist_dict = full_dict[k].__dict__
+            for k in dist_dict:
+                if k == "dist":
+                    comp_dict["scipy_dist_type"] = type(dist_dict[k])
+                    continue
+                elif isinstance(dist_dict[k], dict):
+                    for kwd in dist_dict[k]:
+                        comp_dict[f"scipy_dist_{k}_{kwd}"] = dist_dict[k][kwd]
+                else:
+                    comp_dict[f"scipy_dist_{k}"] = dist_dict[k]
+        return comp_dict
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return self._comparison_dict == other._comparison_dict
+
+    def __hash__(self):
+        return hash(tuple(sorted(self._comparison_dict.items())))
 
     def __repr__(self):
         args_tuple = self.dist.args
