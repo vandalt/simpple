@@ -46,7 +46,6 @@ class Model:
             else:
                 self.vary_p[pname] = pdist
 
-    # TODO: Enable specifying the log-likelihood and forward in the model file?
     @classmethod
     def from_yaml(
         cls, path: Path | str, log_likelihood: Callable | None = None
@@ -55,6 +54,22 @@ class Model:
             mdict = yaml.safe_load(f)
         parameters = parse_parameters(mdict["parameters"])
         return cls(parameters, log_likelihood=log_likelihood)
+
+    def to_yaml(self, path: Path | str, overwrite: bool = False):
+        model_dict = {}
+        model_dict["class"] = self.__class__.__name__
+        model_dict["parameters"] = write_parameters(self.parameters)
+        kwargs_dict = {}
+        kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
+        model_dict["kwargs"] = kwargs_dict
+
+        path = Path(path)
+        if path.exists() and not overwrite:
+            raise FileExistsError(
+                f"The file {path} already exists. Use overwrite=True to overwrite it."
+            )
+        with open(path, mode="w") as f:
+            yaml.dump(model_dict, f)
 
     def _log_likelihood(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(
