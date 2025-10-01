@@ -11,6 +11,7 @@ from simpple.load import (
     get_subclasses,
     load_parameters,
     parse_parameters,
+    write_parameters,
 )
 from simpple.model import ForwardModel, Model
 
@@ -140,3 +141,12 @@ def test_load_parameters(yaml_path: Path):
     else:
         parsed_dict = parse_parameters(yaml_dict)
     assert pdict == parsed_dict
+
+
+@pytest.mark.parametrize("yaml_dict", yaml_parameter_dicts)
+def test_write_parameters(yaml_dict):
+    pdict = parse_parameters(yaml_dict)
+    yaml_results = write_parameters(pdict)
+    # TODO: Return to this for truncnorm when tested to_yaml individually
+    pdict_v2 = parse_parameters(yaml_results)
+    assert pdict == pdict_v2
