@@ -10,7 +10,7 @@ from numpy.random import Generator
 from numpy.typing import ArrayLike
 
 from simpple.distributions import Distribution, Fixed
-from simpple.load import get_func_str, parse_parameters, resolve, write_parameters
+from simpple.load import get_func_str, parse_parameters, resolve, unparse_parameters
 
 if TYPE_CHECKING:
     from nautilus import Prior
@@ -58,7 +58,7 @@ class Model:
     def to_yaml(self, path: Path | str, overwrite: bool = False):
         model_dict = {}
         model_dict["class"] = self.__class__.__name__
-        model_dict["parameters"] = write_parameters(self.parameters)
+        model_dict["parameters"] = unparse_parameters(self.parameters)
         kwargs_dict = {}
         kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
         model_dict["kwargs"] = kwargs_dict
@@ -264,7 +264,7 @@ class ForwardModel(Model):
     def to_yaml(self, path: Path | str, overwrite: bool = False):
         model_dict = {}
         model_dict["class"] = self.__class__.__name__
-        model_dict["parameters"] = write_parameters(self.parameters)
+        model_dict["parameters"] = unparse_parameters(self.parameters)
         kwargs_dict = {}
         kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
         kwargs_dict["forward"] = get_func_str(self._forward)

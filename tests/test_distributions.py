@@ -161,16 +161,30 @@ def test_equal(dist):
 
 
 # One per class to test properties, not math
-# Could actually merge with distributions above
+# TODO: Could actually merge with distributions above and add the distribution to the output dictionary?
 DISTRIBUTIONS_FOR_PROPERTIES = {
-    # TODO: Uncomment and make things work for this one as well
-    # TODO: Test to_yaml for other scipy init or changes nothing?
     sd.ScipyDistribution(uniform, -5, 10): {
         "required_args": ["dist"],
         "yaml_dict": {
             "dist": "ScipyDistribution",
             "args": ["uniform", -5, 10],
             "kwargs": {},
+        },
+    },
+    sd.ScipyDistribution(uniform(-5, 10)): {
+        "required_args": ["dist"],
+        "yaml_dict": {
+            "dist": "ScipyDistribution",
+            "args": ["uniform", -5, 10],
+            "kwargs": {},
+        },
+    },
+    sd.ScipyDistribution(uniform(loc=-5, scale=10)): {
+        "required_args": ["dist"],
+        "yaml_dict": {
+            "dist": "ScipyDistribution",
+            "args": ["uniform"],
+            "kwargs": {"loc": -5, "scale": 10},
         },
     },
     sd.Uniform(10, 25): {

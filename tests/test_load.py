@@ -11,6 +11,7 @@ from simpple.load import (
     get_subclasses,
     load_parameters,
     parse_parameters,
+    unparse_parameters,
     write_parameters,
 )
 from simpple.model import ForwardModel, Model
@@ -144,9 +145,45 @@ def test_load_parameters(yaml_path: Path):
 
 
 @pytest.mark.parametrize("yaml_dict", yaml_parameter_dicts)
-def test_write_parameters(yaml_dict):
+def test_unparse_parameters(yaml_dict):
     pdict = parse_parameters(yaml_dict)
-    yaml_results = write_parameters(pdict)
-    # TODO: Return to this for truncnorm when tested to_yaml individually
+    yaml_results = unparse_parameters(pdict)
     pdict_v2 = parse_parameters(yaml_results)
     assert pdict == pdict_v2
+
+
+@pytest.mark.parametrize("yaml_dict", yaml_parameter_dicts)
+def test_write_parameters_dicts(yaml_dict, tmp_path):
+    # Test round-trip parameter dict -> yaml -> parameter dict
+    pdict = parse_parameters(yaml_dict)
+
+    test_yaml_path = tmp_path / "test.yaml"
+    write_parameters(test_yaml_path, pdict)
+    pdict_read = load_parameters(test_yaml_path)
+    assert pdict == pdict_read
+
+
+@pytest.mark.parametrize("yaml_path", yaml_files)
+def test_write_parameters_files(yaml_path: Path, tmp_path):
+    pdict = load_parameters(yaml_path)
+
+    test_yaml_path = tmp_path / "test.yaml"
+    write_parameters(test_yaml_path, pdict)
+    pdict_read = load_parameters(test_yaml_path)
+
+    # We still test the parameter dicts
+    # because the files will be slightly different (args vs kwargs, etc.)
+    assert pdict == pdict_read
+
+
+def test_write_actual_file(tmp_path):
+    # This yaml file was machine-generated so the output should be the same
+    yaml_path = Path(__file__).parent / "data/line_params_machine.yaml"
+    pdict = load_parameters(yaml_path)
+    test_yaml_path = tmp_path / "test.yaml"
+    write_parameters(test_yaml_path, pdict)
+
+    with open(yaml_path) as f_true, open(test_yaml_path) as f_test:
+        dict_true = yaml.safe_load(f_true)
+        dict_test = yaml.safe_load(f_test)
+    assert dict_true == dict_test

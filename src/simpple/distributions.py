@@ -13,7 +13,6 @@ from scipy.stats import loguniform, rv_continuous, norm, truncnorm, uniform
 from scipy.special import erfinv, erf
 
 
-# TODO: Unit tests for to_yaml
 class Distribution(ABC):
     """Abstract base class for distributions.
 
@@ -49,9 +48,8 @@ class Distribution(ABC):
     @property
     def optional_args(self) -> list[str]:
         sig = inspect.signature(self.__class__.__init__)
-        ignored_args = ["self"]
-        # TODO: args and kwargs are ignored anyways because they are not kwargs.
-        # Should they show up here or nowhere?
+        # NOTE: Even if args and kwargs were not here, they would be ignored as their pval.default is pval.empty
+        ignored_args = ["self", "args", "kwargs"]
         required_args = [
             pname
             for pname, pval in sig.parameters.items()

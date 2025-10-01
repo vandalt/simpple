@@ -1,0 +1,19 @@
+b:
+  args:
+  - uniform
+  - -10
+  - 20
+  dist: ScipyDistribution
+  kwargs: {}
+m:
+  args:
+  - -10
+  - 10
+  dist: Uniform
+  kwargs: {}
+sigma:
+  args:
+  - 1.0e-05
+  - 100
+  dist: LogUniform
+  kwargs: {}

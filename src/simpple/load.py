@@ -23,6 +23,9 @@ def get_subclasses(cls):
 DISTRIBUTIONS = get_subclasses(Distribution)
 
 
+# TODO: Test implementing this in the distribution class?
+# That way symmetric with to_yaml_dict and scipy mess is isolated
+# Would need to bypass for scipy subclasses though
 def parse_parameters(pdict: dict) -> dict[str, Distribution]:
     parameters = {}
     for name, spec in pdict.items():
@@ -76,11 +79,25 @@ def load_parameters(path: Path | str) -> dict[str, Distribution]:
     return parse_parameters(pdict)
 
 
-def write_parameters(parameters: dict[str, Distribution]) -> dict:
+def unparse_parameters(parameters: dict[str, Distribution]) -> dict:
     out_dict = {}
     for pname, pdist in parameters.items():
         out_dict[pname] = pdist.to_yaml_dict()
     return out_dict
+
+
+def write_parameters(
+    path: Path | str, parameters: dict[str, Distribution], overwrite: bool = False
+):
+    yaml_dict = unparse_parameters(parameters)
+
+    path = Path(path)
+    if path.exists() and not overwrite:
+        raise FileExistsError(
+            f"The file {path} already exists. Use overwrite=True to overwrite it."
+        )
+    with open(path, mode="w") as f:
+        yaml.dump(yaml_dict, f)
 
 
 def resolve(func_str):
