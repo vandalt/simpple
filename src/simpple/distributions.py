@@ -410,7 +410,13 @@ class TruncatedNormal(ScipyDistribution):
         super().__init__(truncnorm(a=a, b=b, loc=self.mu, scale=self.sigma))
 
     def __repr__(self) -> str:
-        return f"TruncatedNormal(mu={self.mu}, sigma={self.sigma})"
+        # TODO: Include low and high
+        arg_signature = f"mu={self.mu}, sigma={self.sigma}"
+        if np.isfinite(self.low):
+            arg_signature += f", low={self.low}"
+        if np.isfinite(self.high):
+            arg_signature += f", high={self.high}"
+        return f"TruncatedNormal({arg_signature})"
 
     def log_prob(self, x: float | ArrayLike, *args, **kwargs) -> np.ndarray:
         """Log probability density function.
