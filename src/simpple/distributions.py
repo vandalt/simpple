@@ -45,6 +45,19 @@ class Distribution(ABC):
         ]
         return required_args
 
+    @property
+    def optional_args(self) -> list[str]:
+        sig = inspect.signature(self.__class__.__init__)
+        ignored_args = ["self"]
+        # TODO: args and kwargs are ignored anyways because they are not kwargs.
+        # Should they show up here or nowhere?
+        required_args = [
+            pname
+            for pname, pval in sig.parameters.items()
+            if pname not in ignored_args and pval.default is not pval.empty
+        ]
+        return required_args
+
     def to_yaml_dict(self) -> dict:
         yaml_dict = {}
         yaml_dict["dist"] = self.__class__.__name__

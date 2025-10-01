@@ -158,3 +158,73 @@ def test_equal(dist):
     assert dist == dist
     dist_copy = copy.deepcopy(dist)
     assert dist == dist_copy
+
+
+# One per class to test properties, not math
+# Could actually merge with distributions above
+DISTRIBUTIONS_FOR_PROPERTIES = {
+    # TODO: Uncomment and make things work for this one as well
+    # TODO: Test to_yaml for other scipy init or changes nothing?
+    sd.ScipyDistribution(uniform, -5, 10): {
+        "required_args": ["dist"],
+        "yaml_dict": {
+            "dist": "ScipyDistribution",
+            "args": ["uniform", -5, 10],
+            "kwargs": {},
+        },
+    },
+    sd.Uniform(10, 25): {
+        "required_args": ["low", "high"],
+        "yaml_dict": {"dist": "Uniform", "args": [10, 25]},
+    },
+    sd.Normal(10, 25): {
+        "required_args": ["mu", "sigma"],
+        "yaml_dict": {"dist": "Normal", "args": [10, 25]},
+    },
+    sd.LogUniform(1e-5, 1e5): {
+        "required_args": ["low", "high"],
+        "yaml_dict": {"dist": "LogUniform", "args": [1e-5, 1e5]},
+    },
+    sd.TruncatedNormal(1, 5): {
+        "required_args": ["mu", "sigma"],
+        "optional_args": ["low", "high"],
+        "yaml_dict": {
+            "dist": "TruncatedNormal",
+            "args": [1, 5],
+            "kwargs": {"low": -np.inf, "high": np.inf},
+        },
+    },
+    sd.TruncatedNormal(1, 5, low=0.0): {
+        "required_args": ["mu", "sigma"],
+        "optional_args": ["low", "high"],
+        "yaml_dict": {
+            "dist": "TruncatedNormal",
+            "args": [1, 5],
+            "kwargs": {"low": 0.0, "high": np.inf},
+        },
+    },
+    sd.TruncatedNormal(1, 5, low=0.0, high=10.0): {
+        "required_args": ["mu", "sigma"],
+        "optional_args": ["low", "high"],
+        "yaml_dict": {
+            "dist": "TruncatedNormal",
+            "args": [1, 5],
+            "kwargs": {"low": 0.0, "high": 10.0},
+        },
+    },
+    sd.TruncatedNormal(1, 5, high=10.0): {
+        "required_args": ["mu", "sigma"],
+        "optional_args": ["low", "high"],
+        "yaml_dict": {
+            "dist": "TruncatedNormal",
+            "args": [1, 5],
+            "kwargs": {"low": -np.inf, "high": 10.0},
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("dist,expect", list(DISTRIBUTIONS_FOR_PROPERTIES.items()))
+def test_required_optional_args(dist, expect):
+    assert dist.required_args == expect["required_args"]
+    assert dist.optional_args == expect.get("optional_args", [])
