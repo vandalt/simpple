@@ -13,6 +13,7 @@ from scipy.stats import loguniform, rv_continuous, norm, truncnorm, uniform
 from scipy.special import erfinv, erf
 
 
+# TODO: Unit tests for to_yaml
 class Distribution(ABC):
     """Abstract base class for distributions.
 
@@ -62,6 +63,10 @@ class Distribution(ABC):
         yaml_dict = {}
         yaml_dict["dist"] = self.__class__.__name__
         yaml_dict["args"] = [getattr(self, arg) for arg in self.required_args]
+        # TODO: Maybe we should replace inf with None? Depends whether they work well with YAML... Test that
+        yaml_dict["kwargs"] = {
+            kwarg: getattr(self, kwarg) for kwarg in self.optional_args
+        }
         return yaml_dict
 
     @abstractmethod
@@ -229,6 +234,10 @@ class ScipyDistribution(Distribution):
         return self.dist.rvs(size=size, random_state=seed, **kwargs)
 
 
+# TODO: Consider not making most distribution scipy sublcasses but just using dist attribute?
+# One downside is that workarounds implemented here (example to_yaml being different for sicpy subclasses) can be unexpected if users subclass distribution.
+# So regardless we need to work around that.
+# Then would need to ignore or handle _dist in comparison.
 class Uniform(ScipyDistribution):
     r"""Uniform distribution
 

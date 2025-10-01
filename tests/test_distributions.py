@@ -228,3 +228,11 @@ DISTRIBUTIONS_FOR_PROPERTIES = {
 def test_required_optional_args(dist, expect):
     assert dist.required_args == expect["required_args"]
     assert dist.optional_args == expect.get("optional_args", [])
+
+
+@pytest.mark.parametrize("dist,expect", list(DISTRIBUTIONS_FOR_PROPERTIES.items()))
+def test_to_yaml(dist, expect):
+    yaml_dict = expect["yaml_dict"]
+    yaml_dict.setdefault("args", [])
+    yaml_dict.setdefault("kwargs", {})
+    assert dist.to_yaml_dict() == yaml_dict
