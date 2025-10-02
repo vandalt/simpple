@@ -11,7 +11,7 @@ def x2z(x, loc, scale):
     return (x - loc) / scale
 
 
-def test_hash():
+def test_distribution_hash():
     dist = sd.Uniform(-10.0, 10.0)
     hash(dist)
 

@@ -19,8 +19,9 @@ from simpple.load import (
 from simpple.model import ForwardModel, Model
 
 
-# TODO: Test for custom class implemented in the same
-# TODO: Test that custom class implemented in the same module
+# TODO: Test for custom class implemented in a different module
+# TODO: Test for custom class implemented in the same module
+# TODO: Test for custom class implemented in the current module
 def test_get_subclasses():
     model_subclasses = get_subclasses(Model)
     assert len(model_subclasses) == 1
@@ -128,6 +129,12 @@ def test_parse_parameters_errors():
         ValueError, match="ScipyDistribution should have a distribution"
     ):
         parse_parameters({"a": {"dist": "ScipyDistribution", "args": []}})
+
+    with pytest.raises(TypeError, match="args for ScipyDistribution"):
+        parse_parameters({"a": {"dist": "ScipyDistribution", "args": "0, 10"}})
+
+    with pytest.raises(TypeError, match="Distribution arguments"):
+        parse_parameters({"a": {"dist": "Uniform", "args": "0, 10"}})
 
 
 YAML_DIR = Path(__file__).parent / "data"

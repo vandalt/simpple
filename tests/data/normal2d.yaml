@@ -1,0 +1,8 @@
+class: Model
+parameters:
+  mu1:
+    dist: Uniform
+    args: [-5, 5]
+  mu2:
+    dist: Normal
+    args: [10.0, 50.0]

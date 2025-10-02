@@ -11,12 +11,42 @@ from numpy.typing import ArrayLike
 
 from simpple.distributions import Distribution, Fixed
 from simpple.load import get_func_str, parse_parameters, resolve, unparse_parameters
+from scipy.stats._distn_infrastructure import rv_continuous_frozen
 
 if TYPE_CHECKING:
     from nautilus import Prior
 
 
-# TODO: Unit tests for YAML methods
+def scipy_dist_to_dict(dist):
+    dist_dict = dist.__dict__
+    comp_dict = {}
+    for k in dist_dict:
+        if k == "dist":
+            comp_dict["scipy_dist_type"] = type(dist_dict[k])
+            continue
+        elif isinstance(dist_dict[k], dict):
+            for kwd in dist_dict[k]:
+                comp_dict[f"scipy_dist_{k}_{kwd}"] = dist_dict[k][kwd]
+        else:
+            comp_dict[f"scipy_dist_{k}"] = dist_dict[k]
+    return comp_dict
+
+
+def make_hashable(obj):
+    # TODO: Use for distributions too?
+    # vibe-coded
+    if isinstance(obj, dict):
+        return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
+    elif isinstance(obj, (list, tuple)):
+        return tuple(make_hashable(x) for x in obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tobytes()
+    elif isinstance(obj, rv_continuous_frozen):
+        return make_hashable(scipy_dist_to_dict(obj))
+    else:
+        return obj
+
+
 class Model:
     """Simpple model
 
@@ -30,6 +60,7 @@ class Model:
         parameters: dict[str, Distribution],
         log_likelihood: Callable | None = None,
     ):
+        # TODO: Document that children classes should call super to initialize fixed parameter stuff
         self.parameters = parameters
         if log_likelihood is not None:
             self._log_likelihood = log_likelihood
@@ -46,20 +77,39 @@ class Model:
             else:
                 self.vary_p[pname] = pdist
 
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+        return make_hashable(self.__dict__) == make_hashable(other.__dict__)
+
+    def __hash__(self):
+        return hash(make_hashable(self.__dict__))
+
     @classmethod
-    def from_yaml(
-        cls, path: Path | str, log_likelihood: Callable | None = None
-    ) -> Model:
+    def from_yaml(cls, path: Path | str, *args, **kwargs) -> Model:
         with open(path) as f:
             mdict = yaml.safe_load(f)
         parameters = parse_parameters(mdict["parameters"])
-        return cls(parameters, log_likelihood=log_likelihood)
+        # TODO: Test with and without args and kwargs
+        # TODO: Test args and kwargs passed or not passed override
+        yaml_args = mdict.get("args", [])
+        if len(args) == 0 and len(yaml_args) > 0:
+            args = yaml_args
+        kwargs = mdict.get("kwargs", {}) | kwargs
+        # TODO: Handle this better with a hidden attribute set in init + getter function or property that returns [] if hidden not set?
+        func_kwargs = ["log_likelihood", "forward"]
+        for kwarg in func_kwargs:
+            if kwarg in kwargs and isinstance(kwargs[kwarg], str):
+                kwargs[kwarg] = resolve(kwargs[kwarg])
+        return cls(parameters, *args, **kwargs)
 
     def to_yaml(self, path: Path | str, overwrite: bool = False):
         model_dict = {}
         model_dict["class"] = self.__class__.__name__
         model_dict["parameters"] = unparse_parameters(self.parameters)
+        # TODO: Properly trace kwargs and args and save them
         kwargs_dict = {}
+        # TODO: Trace log-likelihood original location so can be loaded
         kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
         model_dict["kwargs"] = kwargs_dict
 
@@ -243,23 +293,6 @@ class ForwardModel(Model):
         if forward is not None:
             self._forward = forward
             self.forward.__func__.doc__ = self._forward.__doc__
-
-    # TODO: Share code by calling super()? Not sure how would handle extra kwargs then
-    @classmethod
-    def from_yaml(
-        cls,
-        path: Path | str,
-        **kwargs,
-    ) -> Model:
-        with open(path) as f:
-            mdict = yaml.safe_load(f)
-        parameters = parse_parameters(mdict["parameters"])
-        kwargs = mdict.get("kwargs", {}) | kwargs
-        func_names = ["log_likelihood", "forward"]
-        for kname in kwargs:
-            if kname in func_names and isinstance(kwargs[kname], str):
-                kwargs[kname] = resolve(kwargs[kname])
-        return cls(parameters, **kwargs)
 
     def to_yaml(self, path: Path | str, overwrite: bool = False):
         model_dict = {}

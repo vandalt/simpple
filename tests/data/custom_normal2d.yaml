@@ -1,0 +1,11 @@
+class: Normal2DModel
+args:
+  - [0, 10]
+  - 5.0
+parameters:
+  mu1:
+    dist: Uniform
+    args: [-5, 5]
+  mu2:
+    dist: Normal
+    args: [10.0, 50.0]

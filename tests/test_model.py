@@ -1,9 +1,21 @@
+import copy
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from simpple import distributions as sd
 from scipy.stats import norm
+from simpple.load import load_parameters
 from simpple.model import Model, ForwardModel
+
+# TODO: Test this works from neotest and cli, also maybe move lower?
+from custom_models import Normal2DModel, PolyModel
+
+
+@pytest.fixture
+def data_path():
+    return Path(__file__).parent / "data"
 
 
 def build_2d_normal():
@@ -40,6 +52,22 @@ def build_2d_normal_fixed():
         return norm_dist.logpdf(forward(p)).sum()
 
     return ForwardModel(params, log_likelihood, forward)
+
+
+def get_line_data():
+    rng = np.random.default_rng(123)
+    x = np.sort(10 * rng.random(100))
+    m_true = 1.338
+    b_true = -0.45
+    y_true = m_true * x + b_true
+    yerr = 0.1 + 0.5 * rng.random(x.size)
+    y = y_true + 2 * yerr * rng.normal(size=x.size)
+    return x, y, yerr
+
+
+@pytest.fixture
+def line_data():
+    return get_line_data()
 
 
 models = {
@@ -257,3 +285,166 @@ def test_model_with_args():
     # Test that kwarg has an impact
     assert model.log_likelihood(p_dict, norm_dist).ndim == 1
     assert model.log_likelihood(p_dict, norm_dist, do_sum=True).ndim == 0
+
+
+def test_model_hash():
+    model = build_2d_normal()
+    hash(model)
+
+
+def test_model_equal():
+    model2d = build_2d_normal()
+    model2d_cp = copy.deepcopy(model2d)
+    model2d_fixed = build_2d_normal_fixed()
+    assert model2d == model2d_cp
+    assert id(model2d) != id(model2d_cp)
+    assert model2d != model2d_fixed
+
+
+def test_model_from_yaml(data_path):
+    # TODO: Have a fixture for data path here and in other tests
+    yaml_path = data_path / "normal2d.yaml"
+    model_nolike = Model.from_yaml(yaml_path)
+    with pytest.raises(NotImplementedError):
+        model_nolike.log_likelihood({})
+
+    norm_dist = norm([1.0, 5.0], 0.5)
+
+    def log_likelihood(p):
+        return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
+
+    model = Model.from_yaml(yaml_path, log_likelihood)
+    test_p = {"mu1": 0.0, "mu2": 0.0}
+    model.log_likelihood(test_p)
+    model.log_likelihood([0.0, 0.0])
+
+    yaml_path_like = data_path / "normal2d_likelihood.yaml"
+    model_like = Model.from_yaml(yaml_path_like)
+    model_like.log_likelihood(test_p)
+    assert model.log_likelihood(test_p) == model_like.log_likelihood(test_p)
+
+    assert model == model_like
+
+    model_like_zero = Model.from_yaml(yaml_path_like, log_likelihood=lambda p: 0.0)
+    assert model_like_zero.log_likelihood(test_p) == 0.0
+    assert model_like_zero.log_likelihood(test_p) != model_like.log_likelihood(test_p)
+    assert model_like_zero != model_like
+
+
+def test_forward_from_yaml(data_path, line_data):
+    # Model with functions should fail if functions not found
+    yaml_path = data_path / "line.yaml"
+    with pytest.raises(ValueError, match="Could not find function"):
+        ForwardModel.from_yaml(yaml_path)
+
+    test_p = {"m": 1.0, "b": 2.0, "sigma": 3.0}
+    x, y, yerr = line_data
+    test_args = (test_p, x, y, yerr)
+
+    # Model without functions should raise NotImplemented for both
+    yaml_path_noargs = data_path / "line_noargs.yaml"
+    model_noargs = ForwardModel.from_yaml(yaml_path_noargs)
+    with pytest.raises(NotImplementedError):
+        model_noargs.log_likelihood({})
+    with pytest.raises(NotImplementedError):
+        model_noargs.forward({})
+
+    def linear_model(p, x):
+        return p["m"] * x + p["b"]
+
+    def log_likelihood(p, x, y, yerr):
+        ymod = linear_model(p, x)
+        var = yerr**2 + p["sigma"] ** 2
+        return -0.5 * np.sum(np.log(2 * np.pi * var) + (y - ymod) ** 2 / var)
+
+    model = ForwardModel.from_yaml(yaml_path)
+
+    model_kwargs = ForwardModel.from_yaml(
+        yaml_path_noargs, log_likelihood=log_likelihood, forward=linear_model
+    )
+    assert model.log_likelihood(*test_args) == model_kwargs.log_likelihood(*test_args)
+    assert model_kwargs == model
+
+    model_zero_one = ForwardModel.from_yaml(
+        yaml_path, forward=lambda p: 0.0, log_likelihood=lambda p: 1.0
+    )
+    assert model_zero_one.log_likelihood(test_p) == 1.0
+    assert model_zero_one.forward(test_p) == 0.0
+    assert model_zero_one != model
+
+
+@pytest.mark.parametrize(
+    "model_dict",
+    [
+        {
+            "file": "custom_normal2d.yaml",
+            "cls": Normal2DModel,
+            "test_p": {"mu1": 0.0, "mu2": 0.0},
+            "alt_args": ([1.0, 5.0], 0.5),
+        },
+        {
+            "file": "custom_poly.yaml",
+            "cls": PolyModel,
+            "test_p": {"a1": 5.0, "a0": 1.0, "sigma": 2.0},
+            "alt_args": (0,),
+            "extra_args": get_line_data(),
+        },
+    ],
+)
+def test_custom_normal_yaml(data_path, model_dict):
+    yaml_path = data_path / model_dict["file"]
+    cls = model_dict["cls"]
+    test_p = model_dict["test_p"]
+    alt_args = model_dict["alt_args"]
+    model_custom = cls.from_yaml(yaml_path)
+    extra_args = model_dict.get("extra_args", ())
+
+    model_custom_kwargs = cls.from_yaml(yaml_path, *alt_args)
+    pdict = load_parameters(yaml_path)
+    model_custom_noyaml = cls(pdict, *alt_args)
+    assert model_custom_noyaml.log_likelihood(
+        test_p, *extra_args
+    ) == model_custom_kwargs.log_likelihood(test_p, *extra_args)
+    assert model_custom.log_likelihood(
+        test_p, *extra_args
+    ) != model_custom_kwargs.log_likelihood(test_p, *extra_args)
+    assert model_custom_noyaml == model_custom_kwargs
+
+
+norm_dist = norm([1.0, 5.0], 0.5)
+
+
+def log_likelihood(p):
+    return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
+
+
+def test_models_roundtrip(tmp_path):
+    params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
+
+    model = Model(params, log_likelihood)
+
+    test_yaml_path = tmp_path / "test.yaml"
+    model.to_yaml(test_yaml_path)
+    model_read = model.__class__.from_yaml(test_yaml_path)
+    assert model == model_read
+
+
+@pytest.mark.parametrize(
+    "yaml_file,cls",
+    [
+        ("normal2d.yaml", Model),
+        ("normal2d_likelihood.yaml", Model),
+        ("line.yaml", ForwardModel),
+        ("line_noargs.yaml", ForwardModel),
+        ("custom_normal2d.yaml", Normal2DModel),
+        ("custom_poly.yaml", PolyModel),
+    ],
+)
+def test_models_yaml_roundtrip(yaml_file, cls, data_path, tmp_path):
+    # TODO: Being able to infer subclass from file would be better
+    model = cls.from_yaml(data_path / yaml_file)
+
+    test_yaml_path = tmp_path / "test.yaml"
+    model.to_yaml(test_yaml_path)
+    model_read = cls.from_yaml(test_yaml_path)
+    assert model == model_read

@@ -1,0 +1,10 @@
+class: Model
+kwargs:
+  log_likelihood: log_likelihood
+parameters:
+  mu1:
+    dist: Uniform
+    args: [-5, 5]
+  mu2:
+    dist: Normal
+    args: [10.0, 50.0]

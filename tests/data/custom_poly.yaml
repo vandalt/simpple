@@ -1,0 +1,17 @@
+class: PolyModel
+args: [1]
+parameters:
+  a1:
+    dist: Uniform
+    args: [-10, 10]
+  a0:
+    dist: ScipyDistribution
+    args:
+      - uniform
+      - -10
+      - 20
+  sigma:
+    dist: LogUniform
+    args:
+      low: 1.0e-5
+      high: 100

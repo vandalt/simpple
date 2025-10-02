@@ -1,4 +1,3 @@
-# TODO: Unit tests for this module
 import copy
 import inspect
 import sys
@@ -69,6 +68,8 @@ def parse_parameters(pdict: dict) -> dict[str, Distribution]:
             parameters[name] = dist_cls(*args, **kwargs)
         elif isinstance(args, dict):
             parameters[name] = dist_cls(**args, **kwargs)
+        else:
+            raise TypeError("Distribution arguments should be a list, tuple or a dict ")
     return parameters
 
 
