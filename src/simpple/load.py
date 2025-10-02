@@ -1,8 +1,10 @@
 # TODO: Unit tests for this module
-from collections.abc import Callable
+import copy
+import inspect
 import sys
-from pathlib import Path
+from collections.abc import Callable
 from importlib import import_module
+from pathlib import Path
 
 import scipy.stats
 import yaml
@@ -27,6 +29,7 @@ DISTRIBUTIONS = get_subclasses(Distribution)
 # That way symmetric with to_yaml_dict and scipy mess is isolated
 # Would need to bypass for scipy subclasses though
 def parse_parameters(pdict: dict) -> dict[str, Distribution]:
+    pdict = copy.deepcopy(pdict)
     parameters = {}
     for name, spec in pdict.items():
         if "dist" not in spec:
@@ -101,20 +104,31 @@ def write_parameters(
 
 
 def resolve(func_str):
+    func = None
     if "." in func_str:
         module_str, func_str = func_str.rsplit(".", 1)
         module = import_module(module_str)
         func = getattr(module, func_str)
     elif func_str in globals():
-        func = globals()["func_str"]
+        func = globals()[func_str]
     elif func_str in sys.modules.get("__main__", {}).__dict__:
         func = sys.modules["__main__"].__dict__[func_str]
     else:
+        # this loop was 100% vibe-coded
+        for frame_info in inspect.stack():
+            frame = frame_info.frame
+            if func_str in frame.f_locals:
+                func = frame.f_locals[func_str]
+            if func_str in frame.f_globals:
+                func = frame.f_globals[func_str]
+    if not callable(func):
         raise ValueError(f"Could not find function {func_str}")
     return func
 
 
 def get_func_str(func: Callable) -> str:
+    if not callable(func):
+        raise TypeError("func should be a callable")
     mod = func.__module__
     name = func.__qualname__
     if mod == "__main__":

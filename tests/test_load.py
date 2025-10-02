@@ -9,8 +9,10 @@ from simpple.distributions import Distribution
 from simpple.load import (
     DISTRIBUTIONS,
     get_subclasses,
+    get_func_str,
     load_parameters,
     parse_parameters,
+    resolve,
     unparse_parameters,
     write_parameters,
 )
@@ -187,3 +189,54 @@ def test_write_actual_file(tmp_path):
         dict_true = yaml.safe_load(f_true)
         dict_test = yaml.safe_load(f_test)
     assert dict_true == dict_test
+
+
+def dummy_function():
+    pass
+
+
+@pytest.mark.parametrize(
+    "func_str,expect",
+    [
+        ("numpy", False),  # Not available
+        ("yaml", False),  # Not a function
+        ("numpy.linspace", True),  # Can be imported
+        ("write_parameters", True),  # In globals
+        ("dummy_function", True),  # In parent module
+        ("local_dummy_function", True),  # In parent local function scope
+        ("simpple.plot.chainplot", True),  # Not already imported
+    ],
+)
+def test_resolve(func_str, expect):
+    def local_dummy_function():
+        pass
+
+    if not expect:
+        with pytest.raises(ValueError, match="Could not find function"):
+            resolve(func_str)
+        return
+    resolve(func_str)
+
+
+@pytest.mark.parametrize(
+    "func,expect",
+    [
+        (None, "test_load.test_get_func_str.<locals>.local_dummy_function"),
+        (dummy_function, "test_load.dummy_function"),
+        (write_parameters, "simpple.load.write_parameters"),
+        (yaml.safe_load, "yaml.safe_load"),
+        (yaml, False),
+    ],
+)
+def test_get_func_str(func, expect):
+    def local_dummy_function():
+        pass
+
+    if func is None:
+        func = local_dummy_function
+    if not expect:
+        with pytest.raises(TypeError, match="func should be a callable"):
+            get_func_str(func)
+        return
+    func_str = get_func_str(func)
+    assert func_str == expect
