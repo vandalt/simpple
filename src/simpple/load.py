@@ -106,7 +106,9 @@ def write_parameters(
 
 def resolve(func_str):
     func = None
-    if "." in func_str:
+    if "<locals>" in func_str:
+        func_str = func_str.split(".")[-1]
+    if "." in func_str and "<locals>" not in func_str:
         module_str, func_str = func_str.rsplit(".", 1)
         module = import_module(module_str)
         func = getattr(module, func_str)
