@@ -16,38 +16,32 @@ def data_path():
     return Path(__file__).parent / "data"
 
 
+norm_dist = norm([1.0, 5.0], 0.5)
+
+
+def log_likelihood_norm(p):
+    return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
+
+
 def build_2d_normal():
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
-    norm_dist = norm([1.0, 5.0], 0.5)
-
-    def log_likelihood_norm(p):
-        return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
-
     return Model(params, log_likelihood_norm)
 
 
 def build_2d_normal_forward():
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
-    norm_dist = norm([1.0, 5.0], 0.5)
 
     def forward(p):
         return np.array([p["mu1"], p["mu2"]])
-
-    def log_likelihood_norm(p):
-        return norm_dist.logpdf(forward(p)).sum()
 
     return ForwardModel(params, log_likelihood_norm, forward)
 
 
 def build_2d_normal_fixed():
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Fixed(6.0)}
-    norm_dist = norm([1.0, 5.0], 0.5)
 
     def forward(p):
         return np.array([p["mu1"], p["mu2"]])
-
-    def log_likelihood_norm(p):
-        return norm_dist.logpdf(forward(p)).sum()
 
     return ForwardModel(params, log_likelihood_norm, forward)
 
@@ -259,10 +253,11 @@ def test_bad_params(model_name, method):
 
 def test_model_with_args():
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
-    norm_dist = norm([1.0, 5.0], 0.5)
 
     def forward(p):
         return np.array([p["mu1"], p["mu2"]])
+
+    norm_dist = norm([1.0, 5.0], 0.5)
 
     def log_likelihood_norm(p, like_dist, do_sum=False):
         if do_sum:
@@ -304,12 +299,6 @@ def test_model_from_yaml(data_path):
     model_nolike = Model.from_yaml(yaml_path)
     with pytest.raises(NotImplementedError):
         model_nolike.log_likelihood({})
-
-    # TODO: De-duplicate all the log_likelihoods
-    norm_dist = norm([1.0, 5.0], 0.5)
-
-    def log_likelihood_norm(p):
-        return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
 
     model = Model.from_yaml(yaml_path, log_likelihood_norm)
     test_p = {"mu1": 0.0, "mu2": 0.0}
@@ -409,13 +398,6 @@ def test_custom_normal_yaml(data_path, model_dict):
     assert model_custom_noyaml == model_custom_kwargs
 
 
-norm_dist = norm([1.0, 5.0], 0.5)
-
-
-def log_likelihood_norm(p):
-    return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
-
-
 def test_models_roundtrip(tmp_path):
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
 
@@ -439,11 +421,6 @@ def test_models_roundtrip(tmp_path):
     ],
 )
 def test_models_yaml_roundtrip(yaml_file: str, cls, data_path, tmp_path):
-    norm_dist = norm([1.0, 5.0], 0.5)
-
-    def log_likelihood_norm(p):
-        return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
-
     def linear_model(p, x):
         return p["m"] * x + p["b"]
 
