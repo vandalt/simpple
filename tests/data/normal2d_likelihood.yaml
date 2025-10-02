@@ -1,6 +1,6 @@
 class: Model
 kwargs:
-  log_likelihood: log_likelihood
+  log_likelihood: log_likelihood_norm
 parameters:
   mu1:
     dist: Uniform

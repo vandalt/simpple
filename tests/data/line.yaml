@@ -1,6 +1,6 @@
 class: ForwardModel
 kwargs:
-  log_likelihood: log_likelihood
+  log_likelihood: log_likelihood_line
   forward: linear_model
 parameters:
   m:

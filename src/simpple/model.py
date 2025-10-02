@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -10,7 +11,13 @@ from numpy.random import Generator
 from numpy.typing import ArrayLike
 
 from simpple.distributions import Distribution, Fixed
-from simpple.load import get_func_str, parse_parameters, resolve, unparse_parameters
+from simpple.load import (
+    get_func_str,
+    parse_parameters,
+    resolve,
+    unparse_parameters,
+    get_subclasses,
+)
 from scipy.stats._distn_infrastructure import rv_continuous_frozen
 
 if TYPE_CHECKING:
@@ -85,13 +92,34 @@ class Model:
     def __hash__(self):
         return hash(make_hashable(self.__dict__))
 
+    @property
+    def required_args(self) -> list[str]:
+        sig = inspect.signature(self.__class__.__init__)
+        ignored_args = ["self", "parameters", "args", "kwargs"]
+        args = [
+            pname
+            for pname, pval in sig.parameters.items()
+            if pname not in ignored_args and pval.default is pval.empty
+        ]
+        return args
+
+    @property
+    def optional_args(self) -> list[str]:
+        sig = inspect.signature(self.__class__.__init__)
+        # NOTE: Even if args and kwargs were not here, they would be ignored as their pval.default is pval.empty
+        ignored_args = ["self", "args", "kwargs", "parameters"]
+        kwargs = [
+            pname
+            for pname, pval in sig.parameters.items()
+            if pname not in ignored_args and pval.default is not pval.empty
+        ]
+        return kwargs
+
     @classmethod
     def from_yaml(cls, path: Path | str, *args, **kwargs) -> Model:
         with open(path) as f:
             mdict = yaml.safe_load(f)
         parameters = parse_parameters(mdict["parameters"])
-        # TODO: Test with and without args and kwargs
-        # TODO: Test args and kwargs passed or not passed override
         yaml_args = mdict.get("args", [])
         if len(args) == 0 and len(yaml_args) > 0:
             args = yaml_args
@@ -101,17 +129,38 @@ class Model:
         for kwarg in func_kwargs:
             if kwarg in kwargs and isinstance(kwargs[kwarg], str):
                 kwargs[kwarg] = resolve(kwargs[kwarg])
-        return cls(parameters, *args, **kwargs)
+        model_classes = get_subclasses(Model)
+        class_name = mdict.get("class", None)
+        if class_name is not None and class_name != "Model":
+            model_cls = model_classes[class_name]
+        else:
+            model_cls = cls
+        return model_cls(parameters, *args, **kwargs)
 
     def to_yaml(self, path: Path | str, overwrite: bool = False):
         model_dict = {}
         model_dict["class"] = self.__class__.__name__
         model_dict["parameters"] = unparse_parameters(self.parameters)
-        # TODO: Properly trace kwargs and args and save them
+        # TODO: Handle this better with a hidden attribute set in init + getter function or property that returns [] if hidden not set?
+        func_kwargs = ["log_likelihood", "forward"]
+        args_list = []
+        for arg in self.required_args:
+            arg_attr = getattr(self, arg)
+            if arg in func_kwargs:
+                arg_attr = get_func_str(arg_attr)
+            args_list.append(arg_attr)
         kwargs_dict = {}
-        # TODO: Trace log-likelihood original location so can be loaded
-        kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
-        model_dict["kwargs"] = kwargs_dict
+        for kwarg in self.optional_args:
+            if kwarg in func_kwargs:
+                kwarg_attr = getattr(self, f"_{kwarg}")
+                kwarg_attr = get_func_str(kwarg_attr)
+            else:
+                kwarg_attr = getattr(self, kwarg)
+            kwargs_dict[kwarg] = kwarg_attr
+        if len(args_list) > 0:
+            model_dict["args"] = args_list
+        if len(kwargs_dict) > 0:
+            model_dict["kwargs"] = kwargs_dict
 
         path = Path(path)
         if path.exists() and not overwrite:
@@ -294,22 +343,22 @@ class ForwardModel(Model):
             self._forward = forward
             self.forward.__func__.doc__ = self._forward.__doc__
 
-    def to_yaml(self, path: Path | str, overwrite: bool = False):
-        model_dict = {}
-        model_dict["class"] = self.__class__.__name__
-        model_dict["parameters"] = unparse_parameters(self.parameters)
-        kwargs_dict = {}
-        kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
-        kwargs_dict["forward"] = get_func_str(self._forward)
-        model_dict["kwargs"] = kwargs_dict
-
-        path = Path(path)
-        if path.exists() and not overwrite:
-            raise FileExistsError(
-                f"The file {path} already exists. Use overwrite=True to overwrite it."
-            )
-        with open(path, mode="w") as f:
-            yaml.dump(model_dict, f)
+    # def to_yaml(self, path: Path | str, overwrite: bool = False):
+    #     model_dict = {}
+    #     model_dict["class"] = self.__class__.__name__
+    #     model_dict["parameters"] = unparse_parameters(self.parameters)
+    #     kwargs_dict = {}
+    #     kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
+    #     kwargs_dict["forward"] = get_func_str(self._forward)
+    #     model_dict["kwargs"] = kwargs_dict
+    #
+    #     path = Path(path)
+    #     if path.exists() and not overwrite:
+    #         raise FileExistsError(
+    #             f"The file {path} already exists. Use overwrite=True to overwrite it."
+    #         )
+    #     with open(path, mode="w") as f:
+    #         yaml.dump(model_dict, f)
 
     def _forward(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(

@@ -3,14 +3,12 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from custom_models import Normal2DModel, PolyModel
+from scipy.stats import norm
 
 from simpple import distributions as sd
-from scipy.stats import norm
 from simpple.load import load_parameters
-from simpple.model import Model, ForwardModel
-
-# TODO: Test this works from neotest and cli, also maybe move lower?
-from custom_models import Normal2DModel, PolyModel
+from simpple.model import ForwardModel, Model
 
 
 @pytest.fixture
@@ -22,10 +20,10 @@ def build_2d_normal():
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
     norm_dist = norm([1.0, 5.0], 0.5)
 
-    def log_likelihood(p):
+    def log_likelihood_norm(p):
         return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
 
-    return Model(params, log_likelihood)
+    return Model(params, log_likelihood_norm)
 
 
 def build_2d_normal_forward():
@@ -35,10 +33,10 @@ def build_2d_normal_forward():
     def forward(p):
         return np.array([p["mu1"], p["mu2"]])
 
-    def log_likelihood(p):
+    def log_likelihood_norm(p):
         return norm_dist.logpdf(forward(p)).sum()
 
-    return ForwardModel(params, log_likelihood, forward)
+    return ForwardModel(params, log_likelihood_norm, forward)
 
 
 def build_2d_normal_fixed():
@@ -48,10 +46,10 @@ def build_2d_normal_fixed():
     def forward(p):
         return np.array([p["mu1"], p["mu2"]])
 
-    def log_likelihood(p):
+    def log_likelihood_norm(p):
         return norm_dist.logpdf(forward(p)).sum()
 
-    return ForwardModel(params, log_likelihood, forward)
+    return ForwardModel(params, log_likelihood_norm, forward)
 
 
 def get_line_data():
@@ -266,12 +264,12 @@ def test_model_with_args():
     def forward(p):
         return np.array([p["mu1"], p["mu2"]])
 
-    def log_likelihood(p, like_dist, do_sum=False):
+    def log_likelihood_norm(p, like_dist, do_sum=False):
         if do_sum:
             return like_dist.logpdf(forward(p)).sum()
         return like_dist.logpdf(forward(p))
 
-    model = ForwardModel(params, log_likelihood, forward)
+    model = ForwardModel(params, log_likelihood_norm, forward)
 
     p_dict = {"mu1": 3.0, "mu2": 30.0}
     # Test that args are required
@@ -302,18 +300,18 @@ def test_model_equal():
 
 
 def test_model_from_yaml(data_path):
-    # TODO: Have a fixture for data path here and in other tests
     yaml_path = data_path / "normal2d.yaml"
     model_nolike = Model.from_yaml(yaml_path)
     with pytest.raises(NotImplementedError):
         model_nolike.log_likelihood({})
 
+    # TODO: De-duplicate all the log_likelihoods
     norm_dist = norm([1.0, 5.0], 0.5)
 
-    def log_likelihood(p):
+    def log_likelihood_norm(p):
         return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
 
-    model = Model.from_yaml(yaml_path, log_likelihood)
+    model = Model.from_yaml(yaml_path, log_likelihood_norm)
     test_p = {"mu1": 0.0, "mu2": 0.0}
     model.log_likelihood(test_p)
     model.log_likelihood([0.0, 0.0])
@@ -352,7 +350,7 @@ def test_forward_from_yaml(data_path, line_data):
     def linear_model(p, x):
         return p["m"] * x + p["b"]
 
-    def log_likelihood(p, x, y, yerr):
+    def log_likelihood_line(p, x, y, yerr):
         ymod = linear_model(p, x)
         var = yerr**2 + p["sigma"] ** 2
         return -0.5 * np.sum(np.log(2 * np.pi * var) + (y - ymod) ** 2 / var)
@@ -360,7 +358,7 @@ def test_forward_from_yaml(data_path, line_data):
     model = ForwardModel.from_yaml(yaml_path)
 
     model_kwargs = ForwardModel.from_yaml(
-        yaml_path_noargs, log_likelihood=log_likelihood, forward=linear_model
+        yaml_path_noargs, log_likelihood=log_likelihood_line, forward=linear_model
     )
     assert model.log_likelihood(*test_args) == model_kwargs.log_likelihood(*test_args)
     assert model_kwargs == model
@@ -414,14 +412,14 @@ def test_custom_normal_yaml(data_path, model_dict):
 norm_dist = norm([1.0, 5.0], 0.5)
 
 
-def log_likelihood(p):
+def log_likelihood_norm(p):
     return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
 
 
 def test_models_roundtrip(tmp_path):
     params = {"mu1": sd.Uniform(-5, 5), "mu2": sd.Normal(10.0, 50.0)}
 
-    model = Model(params, log_likelihood)
+    model = Model(params, log_likelihood_norm)
 
     test_yaml_path = tmp_path / "test.yaml"
     model.to_yaml(test_yaml_path)
@@ -440,11 +438,36 @@ def test_models_roundtrip(tmp_path):
         ("custom_poly.yaml", PolyModel),
     ],
 )
-def test_models_yaml_roundtrip(yaml_file, cls, data_path, tmp_path):
-    # TODO: Being able to infer subclass from file would be better
-    model = cls.from_yaml(data_path / yaml_file)
+def test_models_yaml_roundtrip(yaml_file: str, cls, data_path, tmp_path):
+    norm_dist = norm([1.0, 5.0], 0.5)
+
+    def log_likelihood_norm(p):
+        return norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
+
+    def linear_model(p, x):
+        return p["m"] * x + p["b"]
+
+    def log_likelihood_line(p, x, y, yerr):
+        ymod = linear_model(p, x)
+        var = yerr**2 + p["sigma"] ** 2
+        return -0.5 * np.sum(np.log(2 * np.pi * var) + (y - ymod) ** 2 / var)
+
+    # Test that Model.from_yaml finds subclasses
+    yaml_path = data_path / yaml_file
+
+    if yaml_path.stem == "normal2d":
+        kwargs = {"log_likelihood": log_likelihood_norm}
+    elif yaml_path.stem == "line_noargs":
+        kwargs = {"log_likelihood": log_likelihood_line, "forward": linear_model}
+    else:
+        kwargs = {}
+
+    model = cls.from_yaml(yaml_path, **kwargs)
+
+    model_generic = Model.from_yaml(yaml_path, **kwargs)
+    assert model == model_generic
 
     test_yaml_path = tmp_path / "test.yaml"
     model.to_yaml(test_yaml_path)
-    model_read = cls.from_yaml(test_yaml_path)
+    model_read = cls.from_yaml(test_yaml_path, **kwargs)
     assert model == model_read

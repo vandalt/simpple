@@ -11,7 +11,9 @@ class Normal2DModel(Model):
         self, parameters: dict[str, sdist.Distribution], mu: ArrayLike, sigma: ArrayLike
     ):
         super().__init__(parameters)
-        self.norm_dist = norm(mu, sigma)
+        self.mu = mu
+        self.sigma = sigma
+        self.norm_dist = norm(self.mu, self.sigma)
 
     def _log_likelihood(self, p):
         return self.norm_dist.logpdf([p["mu1"], p["mu2"]]).sum()
