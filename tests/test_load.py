@@ -19,9 +19,6 @@ from simpple.load import (
 from simpple.model import ForwardModel, Model
 
 
-# TODO: Test for custom class implemented in a different module
-# TODO: Test for custom class implemented in the same module
-# TODO: Test for custom class implemented in the current module
 def test_get_subclasses():
     model_subclasses = get_subclasses(Model)
     assert len(model_subclasses) == 1
@@ -37,6 +34,22 @@ def test_get_subclasses():
     for cls in all_distribution_classes:
         assert cls.__name__ in DISTRIBUTIONS
         assert DISTRIBUTIONS[cls.__name__] == cls
+
+    model_dict = get_subclasses(Model)
+    assert list(model_dict) == ["ForwardModel"]
+
+    from custom_models import PolyModel, Normal2DModel  # noqa: F401
+
+    class DummyModel(Model):
+        pass
+
+    model_dict = get_subclasses(Model)
+    assert sorted(list(model_dict)) == [
+        "DummyModel",
+        "ForwardModel",
+        "Normal2DModel",
+        "PolyModel",
+    ]
 
 
 yaml_parameter_dicts = [

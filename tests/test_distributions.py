@@ -161,7 +161,6 @@ def test_equal(dist):
 
 
 # One per class to test properties, not math
-# TODO: Could actually merge with distributions above and add the distribution to the output dictionary?
 DISTRIBUTIONS_FOR_PROPERTIES = {
     sd.ScipyDistribution(uniform, -5, 10): {
         "required_args": ["dist"],
