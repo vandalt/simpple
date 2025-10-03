@@ -17,6 +17,13 @@ import simpple.utils as ut
 
 
 def _handle_scipy_yaml_dict(yaml_dict: dict) -> dict:
+    """
+    Handle as many corner cases as possible to find the scipy distribution
+    in a yaml dict and convert from string to Python object
+
+    :param yaml_dict: Yaml dictionary, typically loaded directly from a file
+    :return: A copy of the yaml_dict with the scipy distribution name replaced by its class
+    """
     yaml_dict = copy.deepcopy(yaml_dict)
     args = yaml_dict.get("args", [])
     kwargs = yaml_dict.get("kwargs", {})
@@ -67,14 +74,27 @@ class Distribution(ABC):
 
     @property
     def required_args(self) -> list[str]:
+        """List of required arguments at initialization, generated with :func:`simpple.utils.find_args`"""
         return ut.find_args(self, argtype="args")
 
     @property
     def optional_args(self) -> list[str]:
+        """List of optional (keyword) arguments at initialization, generated with :func:`simpple.utils.find_args`"""
         return ut.find_args(self, argtype="kwargs")
 
     @classmethod
     def from_yaml_dict(cls, yaml_dict: dict):
+        """Create a distribution from a YAML dictionary
+
+        The dictionary should have a ``dist`` key with the class name,
+        an ``args`` key with a list of required arguments
+        and optionally a ``kwargs`` key with optional arguments.
+
+        See also: :doc:`Writing Models to and from YAML Files <../tutorials/yaml>`.
+
+        :param yaml_dict: YAML dictionary typically directly loaded from a file
+        :return: A distribution of the type specified by the "dist" key in the dictionary
+        """
         if "dist" not in yaml_dict:
             raise KeyError(
                 "Distribution dictionaries should have a 'dist' key for the distribution type"
@@ -101,6 +121,18 @@ class Distribution(ABC):
             )
 
     def to_yaml_dict(self) -> dict:
+        """Generate YAML dict
+
+        The dictionary will have a ``dist`` key with the class name,
+        an ``args`` key with a list of required arguments
+        and a ``kwargs`` key with optional arguments.
+
+        :attr:`~required_args` and :attr:`~optional_args` are used to infer the ``args`` and ``kwargs``.
+
+        See also: :doc:`Writing Models to and from YAML Files <../tutorials/yaml>`.
+
+        :return: YAML dictionary describing the distribution.
+        """
         yaml_dict = {}
         yaml_dict["dist"] = self.__class__.__name__
         yaml_dict["args"] = [getattr(self, arg) for arg in self.required_args]
@@ -192,6 +224,13 @@ class ScipyDistribution(Distribution):
         return f"ScipyDistribution({self.dist.dist.name}{signature_tuple})"
 
     def to_yaml_dict(self) -> dict:
+        """Generate YAML dict
+
+        Serves the same purpose as :meth:`Distribution.to_yaml_dict()`, but the arguments
+        and keyword arguments are inferred from the :attr:`~dist` attribute.
+
+        :return: YAML dictionary describing the distribution
+        """
         if type(self) is not ScipyDistribution:
             return Distribution.to_yaml_dict(self)
 

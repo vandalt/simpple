@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 class Model:
     """Simpple model
 
+    .. note::
+
+        Subclasses should call ``super().__init__()`` to ensure that the ``fixed_p`` and ``vary_p`` attributes are properly set.
+        See :doc:`Writing Model Classes <../tutorials/writing-model-classes>`.
+
     :param parameters: dictionary of parameters mapping parameter names to a
                       prior (``simpple.Distribution`` object).
     :param log_likelihood: log-likelihood function that accepts a dictionary of parameters.
@@ -35,7 +40,6 @@ class Model:
         parameters: dict[str, Distribution],
         log_likelihood: Callable | None = None,
     ):
-        # TODO: Document that children classes should call super to initialize fixed parameter stuff
         self.parameters = parameters
         if log_likelihood is not None:
             self._log_likelihood = log_likelihood
@@ -62,14 +66,39 @@ class Model:
 
     @property
     def required_args(self) -> list[str]:
+        """List of required arguments at initialization, generated with :func:`simpple.utils.find_args`"""
         return ut.find_args(self, argtype="args")
 
     @property
     def optional_args(self) -> list[str]:
+        """List of optional (keyword) arguments at initialization, generated with :func:`simpple.utils.find_args`"""
         return ut.find_args(self, argtype="kwargs")
 
     @classmethod
     def from_yaml(cls, path: Path | str, *args, **kwargs) -> Model:
+        """Create a model from a YAML file
+
+        The YAML file should have:
+
+        - A ``class`` field mapping to the name of the Model class
+        - A ``parameters`` field mapping parameter names to YAML distribution specs.
+          See also :meth:`simpple.distributions.Distribution.from_yaml_dict()`.
+        - An ``args`` field listing the required arguments for initialization.
+          Required only for model subclasses that accept arguments.
+        - A ``kwargs`` field listing the keyword arguments for initialization.
+          Accepted only for model subclasses that accept keyword arguments.
+          ``log_likelihood`` and ``forward`` are treated as special keyword arguments
+          that refer to functions and we try to resolve them with :func:`simpple.load.resolve`.
+
+        **Note**: All extra arguments (``args``) and keyword arguments (``kwargs``)
+        are passed to this function are passed to the model initialization,
+        and they override their YAML counterpart.
+
+        See also: :doc:`Writing Models to and from YAML Files <../tutorials/yaml>`.
+
+        :param path: Path of the YAML file
+        :return: Model object
+        """
         with open(path) as f:
             mdict = yaml.safe_load(f)
         parameters = parse_parameters(mdict["parameters"])
@@ -276,6 +305,12 @@ class Model:
 
 class ForwardModel(Model):
     """A model whose likelihood calls a forward model as the mean.
+
+    .. note::
+
+        Subclasses should call ``super().__init__()`` to ensure that the ``fixed_p`` and ``vary_p`` attributes are properly set.
+        See :doc:`Writing Model Classes <../tutorials/writing-model-classes>`.
+
 
     :param parameters: dictionary of parameters mapping parameter names to a
                       prior (``simpple.Distribution`` object).
