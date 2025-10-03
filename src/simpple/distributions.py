@@ -1,7 +1,6 @@
 # Required so ArrayLike does not look terrible in docs
 from __future__ import annotations
 
-import inspect
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -11,6 +10,8 @@ from numpy.random import Generator
 from numpy.typing import ArrayLike
 from scipy.stats import loguniform, rv_continuous, norm, truncnorm, uniform
 from scipy.special import erfinv, erf
+
+import simpple.utils as ut
 
 
 class Distribution(ABC):
@@ -29,39 +30,23 @@ class Distribution(ABC):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        return self.__dict__ == other.__dict__
+        return ut.make_hashable(self.__dict__) == ut.make_hashable(other.__dict__)
 
     def __hash__(self):
-        return hash(tuple(sorted(self.__dict__.items())))
+        return hash(ut.make_hashable(self.__dict__))
 
     @property
     def required_args(self) -> list[str]:
-        sig = inspect.signature(self.__class__.__init__)
-        ignored_args = ["self", "args", "kwargs"]
-        required_args = [
-            pname
-            for pname, pval in sig.parameters.items()
-            if pname not in ignored_args and pval.default is pval.empty
-        ]
-        return required_args
+        return ut.find_args(self, argtype="args")
 
     @property
     def optional_args(self) -> list[str]:
-        sig = inspect.signature(self.__class__.__init__)
-        # NOTE: Even if args and kwargs were not here, they would be ignored as their pval.default is pval.empty
-        ignored_args = ["self", "args", "kwargs"]
-        required_args = [
-            pname
-            for pname, pval in sig.parameters.items()
-            if pname not in ignored_args and pval.default is not pval.empty
-        ]
-        return required_args
+        return ut.find_args(self, argtype="kwargs")
 
     def to_yaml_dict(self) -> dict:
         yaml_dict = {}
         yaml_dict["dist"] = self.__class__.__name__
         yaml_dict["args"] = [getattr(self, arg) for arg in self.required_args]
-        # TODO: Maybe we should replace inf with None? Depends whether they work well with YAML... Test that
         yaml_dict["kwargs"] = {
             kwarg: getattr(self, kwarg) for kwarg in self.optional_args
         }
@@ -142,34 +127,6 @@ class ScipyDistribution(Distribution):
     def dist(self):
         """Underlying scipy distribution"""
         return self._dist
-
-    @property
-    def _comparison_dict(self):
-        full_dict = self.__dict__
-        comp_dict = {}
-        for k in full_dict:
-            if k != "_dist":
-                comp_dict[k] = full_dict[k]
-                continue
-            dist_dict = full_dict[k].__dict__
-            for k in dist_dict:
-                if k == "dist":
-                    comp_dict["scipy_dist_type"] = type(dist_dict[k])
-                    continue
-                elif isinstance(dist_dict[k], dict):
-                    for kwd in dist_dict[k]:
-                        comp_dict[f"scipy_dist_{k}_{kwd}"] = dist_dict[k][kwd]
-                else:
-                    comp_dict[f"scipy_dist_{k}"] = dist_dict[k]
-        return comp_dict
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-        return self._comparison_dict == other._comparison_dict
-
-    def __hash__(self):
-        return hash(tuple(sorted(self._comparison_dict.items())))
 
     def __repr__(self):
         args_tuple = self.dist.args
@@ -430,7 +387,6 @@ class TruncatedNormal(ScipyDistribution):
         super().__init__(truncnorm(a=a, b=b, loc=self.mu, scale=self.sigma))
 
     def __repr__(self) -> str:
-        # TODO: Include low and high
         arg_signature = f"mu={self.mu}, sigma={self.sigma}"
         if np.isfinite(self.low):
             arg_signature += f", low={self.low}"

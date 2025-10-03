@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from pathlib import Path
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -18,40 +17,10 @@ from simpple.load import (
     unparse_parameters,
     get_subclasses,
 )
-from scipy.stats._distn_infrastructure import rv_continuous_frozen
+import simpple.utils as ut
 
 if TYPE_CHECKING:
     from nautilus import Prior
-
-
-def scipy_dist_to_dict(dist):
-    dist_dict = dist.__dict__
-    comp_dict = {}
-    for k in dist_dict:
-        if k == "dist":
-            comp_dict["scipy_dist_type"] = type(dist_dict[k])
-            continue
-        elif isinstance(dist_dict[k], dict):
-            for kwd in dist_dict[k]:
-                comp_dict[f"scipy_dist_{k}_{kwd}"] = dist_dict[k][kwd]
-        else:
-            comp_dict[f"scipy_dist_{k}"] = dist_dict[k]
-    return comp_dict
-
-
-def make_hashable(obj):
-    # TODO: Use for distributions too?
-    # vibe-coded
-    if isinstance(obj, dict):
-        return tuple(sorted((k, make_hashable(v)) for k, v in obj.items()))
-    elif isinstance(obj, (list, tuple)):
-        return tuple(make_hashable(x) for x in obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tobytes()
-    elif isinstance(obj, rv_continuous_frozen):
-        return make_hashable(scipy_dist_to_dict(obj))
-    else:
-        return obj
 
 
 class Model:
@@ -87,33 +56,18 @@ class Model:
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        return make_hashable(self.__dict__) == make_hashable(other.__dict__)
+        return ut.make_hashable(self.__dict__) == ut.make_hashable(other.__dict__)
 
     def __hash__(self):
-        return hash(make_hashable(self.__dict__))
+        return hash(ut.make_hashable(self.__dict__))
 
     @property
     def required_args(self) -> list[str]:
-        sig = inspect.signature(self.__class__.__init__)
-        ignored_args = ["self", "parameters", "args", "kwargs"]
-        args = [
-            pname
-            for pname, pval in sig.parameters.items()
-            if pname not in ignored_args and pval.default is pval.empty
-        ]
-        return args
+        return ut.find_args(self, argtype="args")
 
     @property
     def optional_args(self) -> list[str]:
-        sig = inspect.signature(self.__class__.__init__)
-        # NOTE: Even if args and kwargs were not here, they would be ignored as their pval.default is pval.empty
-        ignored_args = ["self", "args", "kwargs", "parameters"]
-        kwargs = [
-            pname
-            for pname, pval in sig.parameters.items()
-            if pname not in ignored_args and pval.default is not pval.empty
-        ]
-        return kwargs
+        return ut.find_args(self, argtype="kwargs")
 
     @classmethod
     def from_yaml(cls, path: Path | str, *args, **kwargs) -> Model:
@@ -124,7 +78,6 @@ class Model:
         if len(args) == 0 and len(yaml_args) > 0:
             args = yaml_args
         kwargs = mdict.get("kwargs", {}) | kwargs
-        # TODO: Handle this better with a hidden attribute set in init + getter function or property that returns [] if hidden not set?
         func_kwargs = ["log_likelihood", "forward"]
         for kwarg in func_kwargs:
             if kwarg in kwargs and isinstance(kwargs[kwarg], str):
@@ -141,7 +94,6 @@ class Model:
         model_dict = {}
         model_dict["class"] = self.__class__.__name__
         model_dict["parameters"] = unparse_parameters(self.parameters)
-        # TODO: Handle this better with a hidden attribute set in init + getter function or property that returns [] if hidden not set?
         func_kwargs = ["log_likelihood", "forward"]
         args_list = []
         for arg in self.required_args:
@@ -342,23 +294,6 @@ class ForwardModel(Model):
         if forward is not None:
             self._forward = forward
             self.forward.__func__.doc__ = self._forward.__doc__
-
-    # def to_yaml(self, path: Path | str, overwrite: bool = False):
-    #     model_dict = {}
-    #     model_dict["class"] = self.__class__.__name__
-    #     model_dict["parameters"] = unparse_parameters(self.parameters)
-    #     kwargs_dict = {}
-    #     kwargs_dict["log_likelihood"] = get_func_str(self._log_likelihood)
-    #     kwargs_dict["forward"] = get_func_str(self._forward)
-    #     model_dict["kwargs"] = kwargs_dict
-    #
-    #     path = Path(path)
-    #     if path.exists() and not overwrite:
-    #         raise FileExistsError(
-    #             f"The file {path} already exists. Use overwrite=True to overwrite it."
-    #         )
-    #     with open(path, mode="w") as f:
-    #         yaml.dump(model_dict, f)
 
     def _forward(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(
