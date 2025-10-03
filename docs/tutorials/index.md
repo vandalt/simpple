@@ -6,5 +6,6 @@
 getting-started
 fitting-a-line
 writing-model-classes
-fixed-parameters.ipynb
+fixed-parameters
+yaml
 ```
