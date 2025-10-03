@@ -20,9 +20,10 @@ license-files = ["LICENSE"]
 dynamic = ["version"]
 dependencies = [
   "numpy",
-  "scipy",
   "matplotlib",
   "nautilus-sampler",
+  "pyyaml",
+  "scipy",
 ]
 
 [tool.hatch.version]
