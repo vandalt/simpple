@@ -3,6 +3,16 @@ import numpy as np
 from scipy.stats._distn_infrastructure import rv_continuous_frozen
 
 
+def get_subclasses(cls):
+    subclasses = cls.__subclasses__()
+    results = {s.__name__: s for s in subclasses}
+    if len(subclasses) == 0:
+        return {}
+    for subclass in subclasses:
+        results |= get_subclasses(subclass)
+    return results
+
+
 def scipy_dist_to_dict(dist):
     dist_dict = dist.__dict__
     comp_dict = {}

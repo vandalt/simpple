@@ -15,7 +15,6 @@ from simpple.load import (
     parse_parameters,
     resolve,
     unparse_parameters,
-    get_subclasses,
 )
 import simpple.utils as ut
 
@@ -82,7 +81,7 @@ class Model:
         for kwarg in func_kwargs:
             if kwarg in kwargs and isinstance(kwargs[kwarg], str):
                 kwargs[kwarg] = resolve(kwargs[kwarg])
-        model_classes = get_subclasses(Model)
+        model_classes = ut.get_subclasses(Model)
         class_name = mdict.get("class", None)
         if class_name is not None and class_name != "Model":
             model_cls = model_classes[class_name]

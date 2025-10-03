@@ -1,17 +1,47 @@
 # Required so ArrayLike does not look terrible in docs
 from __future__ import annotations
 
+import copy
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 import numpy as np
+import scipy.stats
 from numpy.random import Generator
 from numpy.typing import ArrayLike
-from scipy.stats import loguniform, rv_continuous, norm, truncnorm, uniform
-from scipy.special import erfinv, erf
+from scipy.special import erf, erfinv
+from scipy.stats import loguniform, norm, rv_continuous, truncnorm, uniform
 
 import simpple.utils as ut
+
+
+def _handle_scipy_yaml_dict(yaml_dict: dict) -> dict:
+    yaml_dict = copy.deepcopy(yaml_dict)
+    args = yaml_dict.get("args", [])
+    kwargs = yaml_dict.get("kwargs", {})
+
+    if len(args) > 0:
+        if isinstance(args, list):
+            k = 0
+        elif isinstance(args, tuple):
+            k = 0
+            # Cannot assign to tuples so convert to list
+            yaml_dict["args"] = list(args)
+        elif isinstance(args, dict):
+            k = "dist"
+        else:
+            raise TypeError(
+                "args for ScipyDistribution should be a list, tuple or a dict"
+            )
+        yaml_dict["args"][k] = getattr(scipy.stats, args[k])
+    elif "dist" in kwargs:
+        yaml_dict["kwargs"]["dist"] = getattr(scipy.stats, kwargs["dist"])
+    else:
+        raise ValueError(
+            "ScipyDistribution should have a distribution specified in 'args' or 'kwargs'"
+        )
+    return yaml_dict
 
 
 class Distribution(ABC):
@@ -42,6 +72,33 @@ class Distribution(ABC):
     @property
     def optional_args(self) -> list[str]:
         return ut.find_args(self, argtype="kwargs")
+
+    @classmethod
+    def from_yaml_dict(cls, yaml_dict: dict):
+        if "dist" not in yaml_dict:
+            raise KeyError(
+                "Distribution dictionaries should have a 'dist' key for the distribution type"
+            )
+        dist = yaml_dict["dist"]
+        all_distributions = ut.get_subclasses(Distribution)
+        if dist not in all_distributions:
+            raise KeyError(
+                f"Distribution name '{dist}' not found. Available distributions are {all_distributions.keys()}"
+            )
+
+        if dist == "ScipyDistribution":
+            yaml_dict = _handle_scipy_yaml_dict(yaml_dict)
+        dist_cls = all_distributions[dist]
+        args = yaml_dict.get("args", [])
+        kwargs = yaml_dict.get("kwargs", {})
+        if isinstance(args, (list, tuple)):
+            return dist_cls(*args, **kwargs)
+        elif isinstance(args, dict):
+            return dist_cls(**args, **kwargs)
+        else:
+            raise TypeError(
+                "Distribution arguments should be a list, a tuple or a dict "
+            )
 
     def to_yaml_dict(self) -> dict:
         yaml_dict = {}

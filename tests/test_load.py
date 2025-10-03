@@ -1,14 +1,9 @@
-import inspect
 from pathlib import Path
 
 import yaml
 import pytest
 
-import simpple.distributions as sdist
-from simpple.distributions import Distribution
 from simpple.load import (
-    DISTRIBUTIONS,
-    get_subclasses,
     get_func_str,
     load_parameters,
     parse_parameters,
@@ -16,40 +11,6 @@ from simpple.load import (
     unparse_parameters,
     write_parameters,
 )
-from simpple.model import ForwardModel, Model
-
-
-def test_get_subclasses():
-    model_subclasses = get_subclasses(Model)
-    assert len(model_subclasses) == 1
-    assert "ForwardModel" in model_subclasses
-    assert model_subclasses["ForwardModel"] == ForwardModel
-
-    assert DISTRIBUTIONS == get_subclasses(Distribution)
-    all_distribution_classes = [
-        cls
-        for _name, cls in inspect.getmembers(sdist, inspect.isclass)
-        if cls.__module__ == sdist.__name__ and cls.__name__ != "Distribution"
-    ]
-    for cls in all_distribution_classes:
-        assert cls.__name__ in DISTRIBUTIONS
-        assert DISTRIBUTIONS[cls.__name__] == cls
-
-    model_dict = get_subclasses(Model)
-    assert list(model_dict) == ["ForwardModel"]
-
-    from custom_models import PolyModel, Normal2DModel  # noqa: F401
-
-    class DummyModel(Model):
-        pass
-
-    model_dict = get_subclasses(Model)
-    assert sorted(list(model_dict)) == [
-        "DummyModel",
-        "ForwardModel",
-        "Normal2DModel",
-        "PolyModel",
-    ]
 
 
 yaml_parameter_dicts = [

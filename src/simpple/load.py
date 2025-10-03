@@ -5,71 +5,16 @@ from collections.abc import Callable
 from importlib import import_module
 from pathlib import Path
 
-import scipy.stats
 import yaml
 
 from simpple.distributions import Distribution
 
 
-def get_subclasses(cls):
-    subclasses = cls.__subclasses__()
-    results = {s.__name__: s for s in subclasses}
-    if len(subclasses) == 0:
-        return {}
-    for subclass in subclasses:
-        results |= get_subclasses(subclass)
-    return results
-
-
-DISTRIBUTIONS = get_subclasses(Distribution)
-
-
-# TODO: Test implementing this in the distribution class?
-# That way symmetric with to_yaml_dict and scipy mess is isolated
-# Would need to bypass for scipy subclasses though
 def parse_parameters(pdict: dict) -> dict[str, Distribution]:
     pdict = copy.deepcopy(pdict)
     parameters = {}
     for name, spec in pdict.items():
-        if "dist" not in spec:
-            raise KeyError(
-                "Distribution dictionaries should have a 'dist' key for the distribution name"
-            )
-        dist = spec["dist"]
-        args = spec.get("args", [])
-        kwargs = spec.get("kwargs", {})
-        if dist == "ScipyDistribution":
-            if len(args) > 0:
-                if isinstance(args, list):
-                    k = 0
-                elif isinstance(args, tuple):
-                    k = 0
-                    # Cannot assign to tuples so convert to list
-                    args = list(args)
-                elif isinstance(args, dict):
-                    k = "dist"
-                else:
-                    raise TypeError(
-                        "args for ScipyDistribution should be a list, tuple or a dict"
-                    )
-                args[k] = getattr(scipy.stats, args[k])
-            elif "dist" in kwargs:
-                kwargs["dist"] = getattr(scipy.stats, kwargs["dist"])
-            else:
-                raise ValueError(
-                    "ScipyDistribution should have a distribution specified in 'args' or 'kwargs'"
-                )
-        if dist not in DISTRIBUTIONS:
-            raise KeyError(
-                f"Distribution name '{dist}' not found. Available distributions are {DISTRIBUTIONS.keys()}"
-            )
-        dist_cls = DISTRIBUTIONS[dist]
-        if isinstance(args, (list, tuple)):
-            parameters[name] = dist_cls(*args, **kwargs)
-        elif isinstance(args, dict):
-            parameters[name] = dist_cls(**args, **kwargs)
-        else:
-            raise TypeError("Distribution arguments should be a list, tuple or a dict ")
+        parameters[name] = Distribution.from_yaml_dict(spec)
     return parameters
 
 
