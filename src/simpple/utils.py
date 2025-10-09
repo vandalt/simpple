@@ -94,7 +94,11 @@ def find_args(obj: Any, argtype: str = "args") -> list[str]:
         else:
             raise ValueError("argtype must be one of 'args' or 'kwargs'")
 
-    sig = inspect.signature(obj.__class__.__init__)
+    if callable(obj):
+        func = obj
+    else:
+        func = obj.__class__.__init__
+    sig = inspect.signature(func)
     ignored_args = ["self", "args", "kwargs", "parameters"]
     required_args = [
         pname
