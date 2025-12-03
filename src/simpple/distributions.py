@@ -453,11 +453,9 @@ class TruncatedNormal(ScipyDistribution):
                 0 & \text{otherwise}
             \end{cases}
 
-    where :math:`\phi` is the standard normal distribution and :math:`\Phi` the standard normal CDF [1]_.
+    where :math:`\phi` is the standard normal distribution and :math:`\Phi` the standard normal CDF.
 
-    .. rubric:: Footnotes
-
-    .. [1] https://en.wikipedia.org/wiki/Truncated_normal_distribution
+    See `Truncated normal distribution on Wikipedia <https://en.wikipedia.org/wiki/Truncated_normal_distribution>`_.
     """
 
     def __init__(
