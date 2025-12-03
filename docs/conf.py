@@ -18,6 +18,7 @@ release = simpple.__version__
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.viewcode",
     "myst_nb",
 ]
 
