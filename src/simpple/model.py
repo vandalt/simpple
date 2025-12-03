@@ -56,6 +56,18 @@ class Model:
             else:
                 self.vary_p[pname] = pdist
 
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        prior_str = f"parameters={self.parameters}"
+        try:
+            likelihood_name = getattr(
+                self._log_likelihood, "__name__", "_log_likelihood"
+            )
+            likelihood_str = f", log_likelihood={likelihood_name}"
+        except RecursionError:
+            likelihood_str = ""
+        return f"{class_name}({prior_str}{likelihood_str})"
+
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -328,6 +340,23 @@ class ForwardModel(Model):
         if forward is not None:
             self._forward = forward
             self.forward.__func__.doc__ = self._forward.__doc__
+
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        prior_str = f"parameters={self.parameters}"
+        try:
+            likelihood_name = getattr(
+                self._log_likelihood, "__name__", "_log_likelihood"
+            )
+            likelihood_str = f", log_likelihood={likelihood_name}"
+        except RecursionError:
+            likelihood_str = ""
+        try:
+            forward_name = getattr(self._forward, "__name__", "_forward")
+            forward_str = f", forward={forward_name}"
+        except RecursionError:
+            forward_str = ""
+        return f"{class_name}({prior_str}{likelihood_str}{forward_str})"
 
     def _forward(self, parameters, *args, **kwargs) -> float:
         raise NotImplementedError(
