@@ -286,7 +286,7 @@ class ScipyDistribution(Distribution):
 
 
 # TODO: Consider not making most distribution scipy sublcasses but just using dist attribute?
-# One downside is that workarounds implemented here (example to_yaml being different for sicpy subclasses) can be unexpected if users subclass distribution.
+# One downside is that workarounds implemented here (example to_yaml being different for scipy subclasses) can be unexpected if users subclass distribution.
 # So regardless we need to work around that.
 # Then would need to ignore or handle _dist in comparison.
 class Uniform(ScipyDistribution):
