@@ -38,7 +38,8 @@ docs = [
   "corner",
   "arviz",
   "zeus-mcmc",
-  "emcee",
+  # TODO: Use PyPI branch when release with new tqdm is there
+  "emcee@git+https://github.com/dfm/emcee",
   "tqdm",
   "ultranest",
 ]
@@ -46,6 +47,9 @@ test = ["pytest"]
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/simpple/_version.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [project.urls]
 "Homepage" = "https://simpple.readthedocs.io"

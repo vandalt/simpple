@@ -26,7 +26,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for myst-nb -----------------------------------------------------
 # Execute manually to render \r properly
-nb_execution_mode = "off"
+nb_execution_mode = "auto"
 nb_execution_timeout = -1
 
 
