@@ -43,6 +43,7 @@ docs = [
   "tqdm",
   "ipywidgets",
   "ultranest",
+  "ipykernel",
 ]
 test = ["pytest"]
 
